@@ -1,0 +1,21 @@
+[project]
+name = "bibiinstaller"
+version = "0.1.0"
+description = "Bibi Installer using pynsist"
+authors = [
+    {name = "Chunqi SHI", email = "chunqishi@gmail.com"},
+]
+dependencies = [
+    "yarg>=0.1.9",
+    "loguru>=0.7.2",
+    "OmegaConf>=2.3.0",
+    "PyQt6>=6.6.1",
+    "setuptools>=69.2.0",
+]
+requires-python = "==3.10.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false

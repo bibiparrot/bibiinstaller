@@ -1,0 +1,238 @@
+flags:
+  - default: cpu
+    dest: device
+    help: Training device
+    option_strings:
+      - --device
+    type: str
+  - const: true
+    default: false
+    dest: preload_device
+    help: Preload dataset to GPU, suitable for small dataset
+    nargs: 0
+    option_strings:
+      - --preload_device
+    type: bool
+  - default: ../../locals/__local_hdf__/stocks-100-60.hdf5
+    dest: train_data
+    help: Training data file path
+    option_strings:
+      - --train_data
+    type: str
+  - default: ../../locals/__local_hdf__/stocks-100-60.hdf5
+    dest: valid_data
+    help: Validation data file path
+    option_strings:
+      - --valid_data
+    type: str
+  - default: ../../locals/__local_hdf__/stocks-100-60.hdf5
+    dest: test_data
+    help: Testing data file path
+    option_strings:
+      - --test_data
+    type: str
+  - default: 400
+    dest: batch_size
+    help: Batch size
+    option_strings:
+      - --batch_size
+    type: int
+  - default: 0.000125
+    dest: learning_rate
+    help: Optimizer learning rate
+    option_strings:
+      - --learning_rate
+  - default: 0.3
+    dest: dropout
+    help: Layer dropout rate
+    option_strings:
+      - --dropout
+  - default: 0.0001
+    dest: weight_decay
+    help: Optimizer weight decay rate
+    option_strings:
+      - --weight_decay
+  - default: 100
+    dest: epochs
+    help: Training epochs
+    option_strings:
+      - --epochs
+    type: int
+  - default: 10
+    dest: epochs_interval
+    help: Checkpoint every n epochs
+    option_strings:
+      - --epochs_interval
+    type: int
+  - default: 50
+    dest: seed
+    help: Random seed
+    option_strings:
+      - --seed
+    type: int
+  - default: 32
+    dest: n_hidden
+    help: Model filter channels
+    option_strings:
+      - --n_hidden
+    type: int
+  - default: ../../locals/__local_checkpoint__/
+    dest: save
+    help: Checkpoint save folder
+    option_strings:
+      - --save
+    type: str
+  - default: 3
+    dest: kernel_size
+    help: Conv kernel size
+    option_strings:
+      - --kernel_size
+    type: int
+  - default:
+      - 1
+      - 2
+      - 3
+      - 4
+    dest: dilations
+    help: Dilation conv list
+    nargs: +
+    option_strings:
+      - --dilations
+    type: int
+  - default: 30
+    dest: stockid
+    help: Stock Embedding size
+    option_strings:
+      - --stockid
+    type: int
+  - default: 2
+    dest: order
+    help: Order of Graph Convolution Network
+    option_strings:
+      - --order
+    type: int
+  - default: train_logs
+    dest: logs
+    help: Log folder path
+    option_strings:
+      - --logs
+    type: str
+  - default: 256
+    dest: attention_channels
+    help: Channels for attention layer
+    option_strings:
+      - --attention_channels
+    type: int
+  - dest: pretrained
+    help: Pretrained model path
+    option_strings:
+      - --pretrained
+    type: str
+  - dest: pretrained_mode
+    help: Pretrain model load mode
+    option_strings:
+      - --pretrained_mode
+    type: str
+  - const: true
+    default: false
+    dest: tuning
+    help: Disable checkpointing
+    nargs: 0
+    option_strings:
+      - --tuning
+    type: bool
+  - dest: name
+    help: Experiment name
+    option_strings:
+      - --name
+    type: str
+  - default: 1
+    dest: grad_accumulation_period
+    help: Gradient accumulation period
+    option_strings:
+      - --grad_accumulation_period
+    type: int
+  - default: 0.1
+    dest: alpha
+    help: The weight of ranking loss
+    option_strings:
+      - --alpha
+  - default: 10
+    dest: warmup_epochs
+    help: Learning rate warmup epochs
+    option_strings:
+      - --warmup_epochs
+    type: int
+  - default: 50
+    dest: restart_period
+    help: Learning rate restart cycle length
+    option_strings:
+      - --restart_period
+    type: int
+  - default: l2
+    dest: loss
+    help: Regression loss type
+    option_strings:
+      - --loss
+    type: str
+  - default: adam
+    dest: optimizer
+    help: Optimizer type
+    option_strings:
+      - --optimizer
+    type: str
+  - dest: clip
+    help: Gradient clip value
+    option_strings:
+      - --clip
+  - default: origin
+    dest: ranking_loss
+    help: Ranking loss type
+    option_strings:
+      - --ranking_loss
+    type: str
+  - const: true
+    default: false
+    dest: alpha_warmup
+    help: Ranking loss weight warmup option
+    nargs: 0
+    option_strings:
+      - --alpha_warmup
+    type: bool
+  - dest: alpha_warmup_epochs
+    help: 'Ranking loss weight warmup epochs (default: None, the same as warmup_epochs)'
+    option_strings:
+      - --alpha_warmup_epochs
+    type: int
+  - default: 32
+    dest: type_att_channels
+    help: Channel size for type attention module
+    option_strings:
+      - --type_att_channels
+    type: int
+  - default: 128
+    dest: mlp_channels
+    help: Channel size for mid and end MLPs
+    option_strings:
+      - --mlp_channels
+    type: int
+  - const: true
+    default: false
+    dest: tensorboard
+    help: Enable Tensorboard
+    nargs: 0
+    option_strings:
+      - --tensorboard
+    type: bool
+  - const: true
+    default: false
+    dest: true_flag
+    help: Use interpolation flags in samples
+    nargs: 0
+    option_strings:
+      - --true_flag
+    type: bool
+  - default: 0.002
+    dest: delta
+    option_strings:
+      - --delta

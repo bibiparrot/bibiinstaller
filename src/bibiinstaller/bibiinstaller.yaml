@@ -1,0 +1,79 @@
+flags:
+  - default: 3.10.0
+    dest: python_version
+    help: Python version of the installer
+    option_strings:
+      - --python_version
+    type: str
+
+  - default: 64
+    dest: bitness
+    help: Bitness of the installer (32, 64)
+    option_strings:
+      - --bitness
+    type: int
+
+  - default: setup.py
+    dest: setup_py_path
+    help: Path to the setup.py file
+    option_strings:
+      - --setup_py_path
+    type: str
+
+  - dest: entrypoint
+    help: Entrypoint to execute the package
+    option_strings:
+      - --entrypoint
+    type: str
+
+  - default: bibiinstaller.exe
+    dest: package
+    help: Name of the package
+    option_strings:
+      - --package
+    type: str
+
+  - default: bibiinstaller.icon
+    dest: icon_path
+    help: Path to icon to use for the installer
+    option_strings:
+      - --icon_path
+    type: str
+
+  - default: license.txt
+    dest: license_path
+    help: Path to license file
+    option_strings:
+      - --license_path
+    type: str
+
+  - default: extra_packages.txt
+    dest: extra_packages
+    help: Path to a .txt file with a list of packages to be added to the installer besides the dependencies of the main package
+    option_strings:
+      - -ep
+      - --extra_packages
+    type: str
+
+  - dest: conda_path
+    help: Path to conda executable
+    option_strings:
+      - -cp
+      - --conda_path
+    type: str
+
+  - default: exe
+    dest: suffix
+    help: Suffix for the name of the generated executable
+    option_strings:
+      - --suffix
+      - -s
+    type: str
+
+  - default: nsi_templates\application.nsi
+    dest: template
+    help: Path to .nsi template for the installer
+    option_strings:
+      - --template
+      - -t
+    type: str
