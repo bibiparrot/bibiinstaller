@@ -1,0 +1,7 @@
+# Packages to remove from the requirements for example pip or external direct dependencies
+# for example (python-lsp-server spyder-kernels)
+# one for each line
+
+
+pip
+spyder-kernels

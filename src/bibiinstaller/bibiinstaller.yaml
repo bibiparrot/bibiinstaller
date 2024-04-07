@@ -4,6 +4,15 @@ flags:
     help: Python version of the installer
     option_strings:
       - --python_version
+      - --python
+    type: str
+
+  - default: 2.7
+    dest: pynsist_version
+    help: pynsist version of the installer
+    option_strings:
+      - --pynsist_version
+      - --pynsist
     type: str
 
   - default: 64
@@ -13,27 +22,28 @@ flags:
       - --bitness
     type: int
 
-  - default: setup.py
+  - default: ../../setup.py
     dest: setup_py_path
     help: Path to the setup.py file
     option_strings:
       - --setup_py_path
     type: str
 
-  - dest: entrypoint
+  - default: bibiinstaller.pyqt6_example_burning_widget:main
+    dest: entrypoint
     help: Entrypoint to execute the package
     option_strings:
       - --entrypoint
     type: str
 
-  - default: bibiinstaller.exe
+  - default: bibiinstaller
     dest: package
     help: Name of the package
     option_strings:
       - --package
     type: str
 
-  - default: bibiinstaller.icon
+  - default: bibiinstaller.ico
     dest: icon_path
     help: Path to icon to use for the installer
     option_strings:
@@ -47,12 +57,44 @@ flags:
       - --license_path
     type: str
 
-  - default: extra_packages.txt
+  - default: package_configs/extra_packages.txt
     dest: extra_packages
     help: Path to a .txt file with a list of packages to be added to the installer besides the dependencies of the main package
     option_strings:
-      - -ep
+      - -xp
       - --extra_packages
+    type: str
+
+  - default: package_configs/editable_packages.txt
+    dest: editable_packages
+    help: Path to a .txt file with a list of packages to be installed using the editable flag
+    option_strings:
+      - -ep
+      - --editable_packages
+    type: str
+
+  - default: package_configs/add_packages.txt
+    dest: add_packages
+    help: Path to a .txt file with a list of packages to be added to the packages section regardless wheel checks or packages skipped
+    option_strings:
+      - -ap
+      - --add_packages
+    type: str
+
+  - default: package_configs/skip_packages.txt
+    dest: skip_packages
+    help: Path to a .txt file with a list of packages to be skiped when checking for wheels and instead add them directly in the 'packages' section,
+    option_strings:
+      - -sp
+      - --skip_packages
+    type: str
+
+  - default: package_configs/unwanted_packages.txt
+    dest: unwanted_packages
+    help: Path to a .txt file with a list of packages to be removed from the requirements
+    option_strings:
+      - -up
+      - --unwanted_packages
     type: str
 
   - dest: conda_path
@@ -70,10 +112,18 @@ flags:
       - -s
     type: str
 
-  - default: nsi_templates\application.nsi
+  - default: nsi_templates\bibiinstaller.nsi
     dest: template
     help: Path to .nsi template for the installer
     option_strings:
       - --template
       - -t
+    type: str
+
+  - dest: pypi_server
+    # default: https://pypi.tuna.tsinghua.edu.cn/pypi/
+    help: pypi server allow json information by path /{package_name}/json
+    option_strings:
+      - --pypi_server
+      - -ps
     type: str

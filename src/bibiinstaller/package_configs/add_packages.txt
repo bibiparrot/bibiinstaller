@@ -1,0 +1,6 @@
+# Packages to be added to the packages section regardless wheel checks or
+# packages skipped, for example external direct dependencies
+# for example (spyder-kernels python-lsp-server)
+# one for each line
+
+# pywin32

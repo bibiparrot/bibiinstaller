@@ -1,0 +1,3 @@
+# packages to be installed using the editable flag
+# for example (spyder-kernels python-lsp-server)
+# one for each line

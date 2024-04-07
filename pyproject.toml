@@ -5,17 +5,28 @@ description = "Bibi Installer using pynsist"
 authors = [
     {name = "Chunqi SHI", email = "chunqishi@gmail.com"},
 ]
+
 dependencies = [
-    "yarg>=0.1.9",
-    "loguru>=0.7.2",
-    "OmegaConf>=2.3.0",
+#    "yarg>=0.1.9",
+#    "loguru>=0.7.2",
+#    "OmegaConf>=2.3.0",
     "PyQt6>=6.6.1",
-    "setuptools>=69.2.0",
 ]
-requires-python = "==3.10.*"
+#requires-python = "==3.10.*"
+requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 
 
 [tool.pdm]
 distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+        "pip==24.0",
+    #    "setuptools>=69.2.0",
+]
+
+
+[project.gui-scripts]
+bibiinstaller_demo = "bibiinstaller.pyqt6_example_burning_widget:main"

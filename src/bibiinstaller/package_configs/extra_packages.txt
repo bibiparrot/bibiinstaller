@@ -1,0 +1,4 @@
+# packages to be added to the installer besides the dependencies of the main package
+# for example (cython, openpyxl)
+# one for each line
+

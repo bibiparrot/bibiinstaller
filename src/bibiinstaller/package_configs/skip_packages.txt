@@ -1,0 +1,7 @@
+# Packages to skip when checking for wheels and instead add them directly in
+# the 'packages' section,
+# for example ( bcrypt )
+# one for each line
+
+bcrypt # for encryption
+slugify
