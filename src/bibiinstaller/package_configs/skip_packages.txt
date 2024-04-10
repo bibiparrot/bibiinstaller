@@ -5,3 +5,6 @@
 
 bcrypt # for encryption
 slugify
+# pynsist
+setuptools
+wheel

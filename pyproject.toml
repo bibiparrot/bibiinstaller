@@ -7,10 +7,10 @@ authors = [
 ]
 
 dependencies = [
-#    "yarg>=0.1.9",
-#    "loguru>=0.7.2",
-#    "OmegaConf>=2.3.0",
-    "PyQt6>=6.6.1",
+    "yarg>=0.1.9",
+    "loguru>=0.7.2",
+    "bibiflags>=0.1.2",
+    "packaging>=24.0",
 ]
 #requires-python = "==3.10.*"
 requires-python = ">=3.10"
@@ -23,8 +23,8 @@ distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = [
-        "pip==24.0",
-    #    "setuptools>=69.2.0",
+#        "pip==24.0",
+#        "setuptools>=69.2.0",
 ]
 
 

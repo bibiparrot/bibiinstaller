@@ -7,29 +7,25 @@ https://setuptools.pypa.io/en/latest/userguide/entry_point.html
 '''
 
 setup(
-    name='bibiinstaller',
+    name='pyqt6_example',
     version='0.1.0',
     url='',
     license='GPL v3',
     author='Chunqi Shi',
     author_email='chunqishi@gmail.com',
-    description='Bibi Installer using pynsist',
-    # packages=['bibiinstaller'],
+    description='pyqt6 example',
     package_dir={'': 'src'},
     packages=find_packages(
         where='src',  # '.' by default
-        include=['bibiinstaller'],  # ['*'] by default
-        exclude=['assets'],  # empty by default
+        include=['pyqt6_example'],  # ['*'] by default
+        exclude=[],  # empty by default
     ),
     install_requires=[
-         "yarg>=0.1.9",
-         "loguru>=0.7.2",
-         "bibiflags>=0.1.2",
-         "packaging>=24.0",
+        "PyQt6>=6.6.1"
     ],
     entry_points={
         'gui_scripts': [
-            'bibiinstaller_demo = bibiinstaller.pyqt6_example_burning_widget:main',
+            'pyqt6_example = pyqt6_example.pyqt6_example_burning_widget:main',
         ]
     },
 )

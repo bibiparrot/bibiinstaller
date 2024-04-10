@@ -7,7 +7,7 @@ flags:
       - --python
     type: str
 
-  - default: 2.7
+  - default: 2.8
     dest: pynsist_version
     help: pynsist version of the installer
     option_strings:
@@ -22,11 +22,11 @@ flags:
       - --bitness
     type: int
 
-  - default: ../../setup.py
-    dest: setup_py_path
-    help: Path to the setup.py file
+  - default: ../../
+    dest: project_root
+    help: Path root with the setup.py or pyproject.toml in it.
     option_strings:
-      - --setup_py_path
+      - --project_root
     type: str
 
   - default: bibiinstaller.pyqt6_example_burning_widget:main
@@ -113,10 +113,10 @@ flags:
     type: str
 
   - default: nsi_templates\bibiinstaller.nsi
-    dest: template
+    dest: nsi_template
     help: Path to .nsi template for the installer
     option_strings:
-      - --template
+      - --nsi_template
       - -t
     type: str
 

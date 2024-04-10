@@ -1,0 +1,1 @@
+both "setup.py" and "pyproject.toml" are supported.
