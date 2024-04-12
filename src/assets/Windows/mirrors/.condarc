@@ -1,0 +1,19 @@
+#
+#  https://mamba.readthedocs.io/en/latest/user_guide/configuration.html
+#  https://docs.conda.io/projects/conda/en/22.11.x/user-guide/configuration/use-condarc.html#:~:text=condarc%20file%20is%20in%20the,your%20terminal%20or%20Anaconda%20Prompt.
+#
+
+channels:
+  - defaults
+show_channel_urls: true
+default_channels:
+  - http://mirrors.aliyun.com/anaconda/pkgs/main
+  - http://mirrors.aliyun.com/anaconda/pkgs/r
+  - http://mirrors.aliyun.com/anaconda/pkgs/msys2
+custom_channels:
+  conda-forge: http://mirrors.aliyun.com/anaconda/cloud
+  msys2: http://mirrors.aliyun.com/anaconda/cloud
+  bioconda: http://mirrors.aliyun.com/anaconda/cloud
+  menpo: http://mirrors.aliyun.com/anaconda/cloud
+  pytorch: http://mirrors.aliyun.com/anaconda/cloud
+  simpleitk: http://mirrors.aliyun.com/anaconda/cloud

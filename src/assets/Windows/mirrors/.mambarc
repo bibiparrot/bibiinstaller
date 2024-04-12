@@ -1,0 +1,6 @@
+#
+#  https://mamba.readthedocs.io/en/latest/user_guide/configuration.html
+#
+channels:
+  - conda-forge
+always_yes: true

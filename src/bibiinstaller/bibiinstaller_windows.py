@@ -172,23 +172,26 @@ def subprocess_run(args):
         sys.exit(cp.returncode)
 
 
-def create_python_env(target_directory, python_version: str, name: str):
+def create_python_env(target_directory, python_version: str, environment_name: str = None):
     micromamba_path = ASSETS_HOME / 'Windows' / 'micromamba'
-    micromamba_exes = micromamba_path.glob('*.exe')
-    if len(list(micromamba_exes)) < 1:
+    logger.debug(f"micromamba_path = [{micromamba_path}]")
+    micromamba_exes = list(micromamba_path.glob('*.exe'))
+    if len(micromamba_exes) < 1:
         logger.warning(f'NO micromamba.exe under [{micromamba_path}]')
-    micromamba_exe = sorted(micromamba_exes, key=lambda file: Path(file).lstat().st_mtime, reverse=True)[0].absolute()
+    micromamba_exe = sorted(micromamba_exes, key=lambda file: Path(file).lstat().st_mtime, reverse=True)[0].resolve()
+    logger.debug(micromamba_exe)
     python = '.'.join(python_version.split('.')[:2])
 
     logger.info(f'micromamba [{micromamba_exe}]')
     conda_path = Path(target_directory) / f'conda_python_{python}'
-    environment_name = f'python_{python}'
+    if environment_name is None:
+        environment_name = f'python_{python}'
     subprocess_run([
         micromamba_exe, 'create', '--yes', '-n', environment_name, f'python={python}',
         '-c', 'conda-forge', '--root-prefix', conda_path
     ])
     python_exe = conda_path / 'envs' / environment_name / 'python.exe'
-    return python_exe
+    return python_exe.resolve()
 
 
 def create_packaging_venv(
@@ -209,8 +212,11 @@ def create_packaging_venv(
             "-y"]
         env_path = os.path.join(fullpath, "python.exe")
     else:
-        logger.info(f'USE Python: {sys.executable}')
-        command = [sys.executable, "-m", "venv", fullpath]
+        python_exe = create_python_env(target_directory, python_version)
+        # logger.info(f'USE Python: {sys.executable}')
+        # command = [sys.executable, "-m", "venv", fullpath]
+        logger.info(f'USE Python: {python_exe}')
+        command = [python_exe, "-m", "venv", fullpath]
         env_path = os.path.join(fullpath, "Scripts", "python.exe")
     logger.info(command)
     subprocess_run(command)
