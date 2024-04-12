@@ -9,8 +9,9 @@ authors = [
 dependencies = [
     "yarg>=0.1.9",
     "loguru>=0.7.2",
-    "bibiflags>=0.1.2",
+    "bibiflags>=0.1.4",
     "packaging>=24.0",
+    "tomli>=2.0.1",
 ]
 #requires-python = "==3.10.*"
 requires-python = ">=3.10"
@@ -28,5 +29,5 @@ dev = [
 ]
 
 
-[project.gui-scripts]
-bibiinstaller_demo = "bibiinstaller.pyqt6_example_burning_widget:main"
+[project.scripts]
+bibiinstaller= "bibiinstaller.bibiinstaller_windows:main"

@@ -22,14 +22,15 @@ setup(
         exclude=['assets'],  # empty by default
     ),
     install_requires=[
-         "yarg>=0.1.9",
-         "loguru>=0.7.2",
-         "bibiflags>=0.1.2",
-         "packaging>=24.0",
+        "yarg>=0.1.9",
+        "loguru>=0.7.2",
+        "bibiflags>=0.1.4",
+        "packaging>=24.0",
+        "tomli>=2.0.1",
     ],
     entry_points={
-        'gui_scripts': [
-            'bibiinstaller_demo = bibiinstaller.pyqt6_example_burning_widget:main',
+        'console_scripts': [
+            'bibiinstaller = bibiinstaller.bibiinstaller_windows:main',
         ]
     },
 )
