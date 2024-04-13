@@ -62,6 +62,7 @@ from loguru import logger
 PYPI_SERVER_LOCAL_CACHE = 'pypi_server.local_cache.shelve'
 
 PYNSIST_CFG_TEMPLATE = """
+# see: https://pynsist.readthedocs.io/en/latest/cfgfile.html
 [Application]
 name={name}
 version={version}
@@ -76,7 +77,6 @@ bitness={bitness}
 format=bundled
 
 [Include]
-# extra_wheel_sources=C:\\Users\\shi\\AppData\\Local\\pynsist\\pypi
 pypi_wheels=
     {pypi_wheels}
 extra_wheel_sources=
@@ -84,7 +84,8 @@ extra_wheel_sources=
 packages=
     {packages}
 files={package_dist_info} > $INSTDIR/pkgs
-
+    {package_exe}
+    
 [Build]
 installer_name={installer_name}
 nsi_template={template}
@@ -205,11 +206,9 @@ def create_packaging_venv(
     fullpath = os.path.join(target_directory, venv_name)
     if conda_path and Path(conda_path).exists():
         logger.info(f'USE Conda: {conda_path}')
-        command = [
-            conda_path, "create",
-            "-p", os.path.normpath(fullpath),
-            "python={}".format(python_version),
-            "-y"]
+        command = [conda_path, "create",
+                   "-p", os.path.normpath(fullpath),
+                   "python={}".format(python_version), "-y"]
         env_path = os.path.join(fullpath, "python.exe")
     else:
         python_exe = create_python_env(target_directory, python_version)
@@ -302,7 +301,7 @@ def pip_wheels_in(work_dir, python, requirements, skip_packages):
             wheels.append(requirements[i])
         else:
             logger.warning(f'{requirements[i]} {package_name}')
-    return wheels
+    return wheels, pip_download
 
 
 def pypi_wheels_in(requirements, skip_packages, pypi_server=None):
@@ -432,7 +431,7 @@ def create_pynsist_cfg(
     ]
     skip_wheels = [package] + skip_packages
     # wheels = pypi_wheels_in(requirements, skip_wheels, pypi_server)
-    wheels = pip_wheels_in(work_dir, python, requirements, skip_packages)
+    wheels, pip_download = pip_wheels_in(work_dir, python, requirements, skip_packages)
     more_skip_packages = [package] + skip_packages
     packages = packages_from(requirements, wheels, more_skip_packages, add_packages)
     logger.info(f'requirements={requirements}')
@@ -451,11 +450,12 @@ def create_pynsist_cfg(
     if not suffix:
         suffix = ""
 
-    # TODO: fill extra_wheel_sources
+    # fill extra_wheel_sources
     # SEE: https://pynsist.readthedocs.io/en/latest/
-    extra_wheel_sources = []
+    extra_wheel_sources = [str(pip_download)]
 
     installer_exe = installer_name.format(package_name, bitness, suffix)
+    changed_icon_exe = change_exe_icon(work_dir, package_name, icon_file)
 
     pynsist_cfg_payload = PYNSIST_CFG_TEMPLATE.format(
         name=package_name,
@@ -471,7 +471,8 @@ def create_pynsist_cfg(
         packages="\n    ".join(packages),
         installer_name=installer_exe,
         template=nsi_template_path,
-        package_dist_info=package_dist_info
+        package_dist_info=package_dist_info,
+        package_exe=str(changed_icon_exe)
     )
 
     logger.info(f"pynsist_cfg_payload:\n{pynsist_cfg_payload}")
@@ -623,8 +624,7 @@ def run_installer(python_version,
                   conda_path=None,
                   suffix=None,
                   nsi_template_path=None,
-                  pypi_server=None,
-                  download_assets=False):
+                  pypi_server=None):
     """
     Run the installer generation.
 
@@ -651,9 +651,7 @@ def run_installer(python_version,
                     work_dir,
                     f"{packaging_venv_dir}/Lib/site-packages/nsist"))
             os.makedirs(template_new_path, exist_ok=True)
-            # shutil.copy(
-            #     nsi_template,
-            #     os.path.join(template_new_path, template_basename))
+
             update_application_nsi(
                 nsi_template_path,
                 os.path.join(template_new_path, template_basename),
@@ -707,6 +705,7 @@ def run_installer(python_version,
             logger.warning(f"ERROR: {Path(project_root) / 'setup.py'} or {Path(project_root) / 'pyproject.toml'}")
             package_name = package
             package_version = "0.1.0"
+            package_author = ""
 
         package_dist_info = f"{package_name}-{package_version}.dist-info"
 
@@ -789,13 +788,13 @@ def get_absolute_path(root, file):
         return (Path(root) / file).resolve()
 
 
-def embed_amd64_url_exist(python_version):
-    url = f'https://www.python.org/ftp/python/{python_version}/python-{python_version}-embed-amd64.zip'
-    try:
-        response = requests.head(url)
-        return response.status_code == 200
-    except requests.exceptions.RequestException as e:
-        return False
+# def embed_amd64_url_exist(python_version):
+#     url = f'https://www.python.org/ftp/python/{python_version}/python-{python_version}-embed-amd64.zip'
+#     try:
+#         response = requests.head(url)
+#         return response.status_code == 200
+#     except requests.exceptions.RequestException as e:
+#         return False
 
 
 def url_exist(url):
@@ -831,11 +830,27 @@ def lazy_import(file_path, module_name):
     return module
 
 
-def get_config_variables(file_path, module_name):
-    configs_py = lazy_import(file_path, module_name)
+def get_config_variables(python_file_path, module_name):
+    configs_py = lazy_import(python_file_path, module_name)
     names = [name for name in dir(configs_py) if not name.startswith('__')]
     values = [getattr(configs_py, name) for name in names]
     return dict(zip(names, values))
+
+
+def change_exe_icon(work_dir, package_name, icon_file):
+    '''
+    ResourceHacker.exe -open bibiinstaller_app.exe -save app.exe -action addskip -res bibiinstaller.ico -mask ICONGROUP,MAINICON
+    '''
+    windows_assets_dir = (Path(work_dir) / f"windows_assets").resolve()
+    changed_icon_exe = windows_assets_dir / f'{package_name}.exe'
+    resource_hacker = ASSETS_HOME / 'Windows' / 'icon_configs' / 'ResourceHacker.exe'
+    bibiinstaller_app = ASSETS_HOME / 'Windows' / 'exes' / 'bibiinstaller_app.exe'
+    subprocess_run([
+        resource_hacker, '-open', bibiinstaller_app, '-save', changed_icon_exe,
+        '-action', 'addskip', '-res', icon_file, '-mask', 'ICONGROUP,MAINICON'
+    ])
+
+    return changed_icon_exe
 
 
 def main(config_root):
@@ -916,47 +931,3 @@ def main(config_root):
 if __name__ == "__main__":
     config_root = Path(__file__).parent
     main(config_root)
-
-    # flags = BibiFlags(app_name='bibiinstaller_windows', root=str(path_root))
-    # logger.info(pformat(flags.parameters))
-    #
-    # from operator import itemgetter
-    #
-    # (python_version, pynsist_version, bitness, setup_py_path,
-    #  entrypoint, package, icon_path,
-    #  license_path, extra_packages, editable_packages, unwanted_packages, skip_packages, add_packages,
-    #  conda_path, suffix, template, pypi_server, build_root) = itemgetter(
-    #     'python_version', 'pynsist_version', 'bitness', 'setup_py_path',
-    #     'entrypoint', 'package', 'icon_path',
-    #     'license_path', 'extra_packages', 'editable_packages', 'unwanted_packages', 'skip_packages', 'add_packages',
-    #     'conda_path', 'suffix', 'template', 'pypi_server', 'build_root'
-    # )(flags.parameters)
-    #
-    # setup_py_repo_root = get_abs_path(path_root, os.path.dirname(setup_py_path))
-    # icon_path = get_abs_path(path_root, icon_path)
-    # license_path = get_abs_path(path_root, license_path)
-    # if extra_packages:
-    #     extra_packages_txtfile = get_abs_path(path_root, extra_packages)
-    # if editable_packages:
-    #     editable_package_txtfile = get_abs_path(path_root, editable_packages)
-    # if unwanted_packages:
-    #     unwanted_packages_txtfile = get_abs_path(path_root, unwanted_packages)
-    # if skip_packages:
-    #     skip_packages_txtfile = get_abs_path(path_root, skip_packages)
-    # if add_packages:
-    #     add_packages_txtfile = get_abs_path(path_root, add_packages)
-    # if template:
-    #     nsi_template = get_abs_path(path_root, template)
-    # #
-    # run(python_version, bitness, setup_py_repo_root, entrypoint,
-    #     package, icon_path, license_path,
-    #     pynsist_version=pynsist_version,
-    #     extra_packages_txtfile=extra_packages_txtfile,
-    #     editable_package_txtfile=editable_package_txtfile,
-    #     unwanted_packages_txtfile=unwanted_packages_txtfile,
-    #     skip_packages_txtfile=skip_packages_txtfile,
-    #     add_packages_txtfile=add_packages_txtfile,
-    #     conda_path=conda_path,
-    #     suffix=suffix,
-    #     nsi_template=nsi_template,
-    #     pypi_server=pypi_server)

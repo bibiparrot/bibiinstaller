@@ -1,2 +1,2 @@
 # https://www.angusj.com/resourcehacker/
-rh.exe -open old.exe -save new.exe -action addskip -res my.ico -mask ICONGROUP,MAINICON,
+ResourceHacker.exe -open bibiinstaller_app.exe -save app.exe -action addskip -res bibiinstaller.ico -mask ICONGROUP,MAINICON
