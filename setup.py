@@ -27,6 +27,7 @@ setup(
         "bibiflags>=0.1.4",
         "packaging>=24.0",
         "tomli>=2.0.1",
+        "pillow>=10.3.0",
     ],
     entry_points={
         'console_scripts': [

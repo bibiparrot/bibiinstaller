@@ -187,11 +187,13 @@ def create_python_env(target_directory, python_version: str, environment_name: s
     conda_path = Path(target_directory) / f'conda_python_{python}'
     if environment_name is None:
         environment_name = f'python_{python}'
-    subprocess_run([
-        micromamba_exe, 'create', '--yes', '-n', environment_name, f'python={python}',
-        '-c', 'conda-forge', '--root-prefix', conda_path
-    ])
+
     python_exe = conda_path / 'envs' / environment_name / 'python.exe'
+    if not python_exe.exists():
+        subprocess_run([
+            micromamba_exe, 'create', '--yes', '-n', environment_name, f'python={python}',
+            '-c', 'conda-forge', '--root-prefix', conda_path
+        ])
     return python_exe.resolve()
 
 
@@ -540,11 +542,6 @@ def copy_assets(assets_dir, work_dir):
         os.path.join(work_dir, "pynsist_pkgs"),
         dirs_exist_ok=True)
 
-    logger.info("Copying micromamba assets")
-    shutil.copy(
-        "installers/Windows/assets/micromamba/micromamba.exe",
-        os.path.join(work_dir, "micromamba.exe"))
-
     logger.info("Copying NSIS plugins into discoverable path")
     contents = os.listdir(
         "installers/Windows/assets/nsist/plugins/x86-unicode/")
@@ -564,6 +561,16 @@ def copy_assets():
     # pynsist_pkgs --> work_dir/pynsist_pkgs, same directory of pynsist.cfg
     #
     pass
+
+
+def png_to_icon(png_file, icon_file):
+    '''
+    pip install pillow.
+    '''
+    from PIL import Image
+    logo = Image.open(png_file)
+    logo.save(icon_file, format='ICO')
+    logger.info(f"CONVERT [{png_file}] to [{icon_file}]")
 
 
 def read_setup_py_info(file_path):
@@ -788,15 +795,6 @@ def get_absolute_path(root, file):
         return (Path(root) / file).resolve()
 
 
-# def embed_amd64_url_exist(python_version):
-#     url = f'https://www.python.org/ftp/python/{python_version}/python-{python_version}-embed-amd64.zip'
-#     try:
-#         response = requests.head(url)
-#         return response.status_code == 200
-#     except requests.exceptions.RequestException as e:
-#         return False
-
-
 def url_exist(url):
     try:
         response = requests.head(url)
@@ -853,7 +851,19 @@ def change_exe_icon(work_dir, package_name, icon_file):
     return changed_icon_exe
 
 
-def main(config_root):
+def prepare_nsis_plugins(work_dir):
+    windows_assets_dir = (Path(work_dir) / f"windows_assets").resolve()
+    nsis_dir = ASSETS_HOME / 'Windows' / 'nsis'
+    nsis_zip = nsis_dir / 'nsis-3.10-win.zip'
+    nsis_plugins_dir = nsis_dir / 'Plugins'
+    unzip_file(nsis_zip, windows_assets_dir)
+    work_nsis_dir = windows_assets_dir / 'nsis-3.10-win'
+    shutil.copytree(nsis_plugins_dir, work_nsis_dir / 'Plugins', dirs_exist_ok=True)
+    return nsis_plugins_dir.resolve()
+
+
+def main():
+    config_root = Path(__file__).parent
     import argparse
     parser = argparse.ArgumentParser(
         prog='bibiinstaller',
@@ -885,6 +895,12 @@ def main(config_root):
 
     icon_path = get_absolute_path(project_root,
                                   flags.parameters.get('icon_path') or configs.ICON_PATH)
+
+    if not str(icon_path).lower().endswith('ico'):
+        icon_path_convert = str(icon_path) + '.icon'
+        png_to_icon(icon_path, icon_path_convert)
+        icon_path = Path(icon_path_convert).resolve()
+
     license_path = get_absolute_path(project_root,
                                      flags.parameters.get('license_txt_path') or configs.LICENSE_TXT_PATH)
 
@@ -929,5 +945,4 @@ def main(config_root):
 
 
 if __name__ == "__main__":
-    config_root = Path(__file__).parent
-    main(config_root)
+    main()

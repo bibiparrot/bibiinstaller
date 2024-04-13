@@ -1,2 +1,3 @@
 # https://www.angusj.com/resourcehacker/
+# https://www.freeconvert.com/png-to-ico/download
 ResourceHacker.exe -open bibiinstaller_app.exe -save app.exe -action addskip -res bibiinstaller.ico -mask ICONGROUP,MAINICON

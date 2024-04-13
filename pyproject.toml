@@ -12,6 +12,7 @@ dependencies = [
     "bibiflags>=0.1.4",
     "packaging>=24.0",
     "tomli>=2.0.1",
+    "pillow>=10.3.0",
 ]
 #requires-python = "==3.10.*"
 requires-python = ">=3.10"
