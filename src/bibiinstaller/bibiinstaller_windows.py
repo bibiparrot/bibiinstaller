@@ -214,8 +214,7 @@ def create_packaging_venv(
         env_path = os.path.join(fullpath, "python.exe")
     else:
         python_exe = create_python_env(target_directory, python_version)
-        # logger.info(f'USE Python: {sys.executable}')
-        # command = [sys.executable, "-m", "venv", fullpath]
+        logger.debug(f'BibiInstaller Python: {sys.executable}')
         logger.info(f'USE Python: {python_exe}')
         command = [python_exe, "-m", "venv", fullpath]
         env_path = os.path.join(fullpath, "Scripts", "python.exe")
@@ -770,6 +769,9 @@ def run_installer(python_version,
             extras=extra_packages_txtfile,
             suffix=suffix, nsi_template_path=nsi_template_path, pypi_server=pypi_server)
 
+        logger.info("Extracting nsis.")
+        prepare_nsis_plugins(work_dir)
+
         logger.info("Installing pynsist.")
         subprocess_run([env_python, "-m", "pip", "install", f"pynsist=={pynsist_version}",
                         "--no-warn-script-location"])
@@ -853,14 +855,17 @@ def change_exe_icon(work_dir, package_name, icon_file):
 
 def prepare_nsis_plugins(work_dir):
     windows_assets_dir = (Path(work_dir) / f"windows_assets").resolve()
+    work_nsis_dir = windows_assets_dir / 'nsis-3.10-win'
     nsis_dir = ASSETS_HOME / 'Windows' / 'nsis'
     nsis_zip = nsis_dir / 'nsis-3.10-win.zip'
-    nsis_plugins_dir = nsis_dir / 'Plugins'
+    nsis_plugins_dir = (nsis_dir / 'Plugins').resolve()
     unzip_file(nsis_zip, windows_assets_dir)
-    work_nsis_dir = windows_assets_dir / 'nsis-3.10-win'
     shutil.copytree(nsis_plugins_dir, work_nsis_dir / 'Plugins', dirs_exist_ok=True)
-    return nsis_plugins_dir.resolve()
-
+    # logger.debug(os.environ["PATH"])
+    # for pynsist to locate makensis [shutil.which("makensis")]
+    os.environ["PATH"] += os.pathsep + str(work_nsis_dir)
+    # logger.debug(os.environ["PATH"])
+    return work_nsis_dir
 
 def main():
     config_root = Path(__file__).parent
@@ -897,7 +902,7 @@ def main():
                                   flags.parameters.get('icon_path') or configs.ICON_PATH)
 
     if not str(icon_path).lower().endswith('ico'):
-        icon_path_convert = str(icon_path) + '.icon'
+        icon_path_convert = str(icon_path) + '.ico'
         png_to_icon(icon_path, icon_path_convert)
         icon_path = Path(icon_path_convert).resolve()
 

@@ -51,19 +51,4 @@ pprint(package)
 releases = package.release(version)
 pprint(releases)
 
-# def read_packages(package_txt_file):
-#     if Path(package_txt_file).exists():
-#         packages = [line.strip().split('#', 1)[0].strip() for line in
-#                     open(package_txt_file, 'r', encoding='utf').readlines()]
-#         packages = [package for package in packages if len(package) > 0]
-#     else:
-#         packages = []
-#     return packages
-#
-#
-# print(read_packages('package_configs/add_packages.txt'))
-# print(read_packages('package_configs/editable_packages.txt'))
-# print(read_packages('package_configs/extra_packages.txt'))
-# print(read_packages('package_configs/skip_packages.txt'))
-# print(read_packages('package_configs/unwanted_packages.txt'))
 
