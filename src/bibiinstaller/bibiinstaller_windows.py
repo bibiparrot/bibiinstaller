@@ -58,21 +58,12 @@ bitness={bitness}
 format=bundled
 
 [Include]
-pypi_wheels=
-    {pypi_wheels}
-    
-extra_wheel_sources=
-    {extra_wheel_sources}
+pypi_wheels={pypi_wheels}
+extra_wheel_sources={extra_wheel_sources}
+local_wheels={local_wheels}     
+packages={packages}  
+files={files}
 
-local_wheels=
-    {local_wheels}
-        
-packages=
-    {packages}
-    
-files={package_dist_info} > $INSTDIR/pkgs
-    {package_exe}
-    
 [Build]
 installer_name={installer_name}
 nsi_template={template}
@@ -267,12 +258,12 @@ def get_cached_package(name, pypi_server, root=None):
         return yarg_package
 
 
-def package_name(requirement):
-    """
-    Return the name component of a `name==version` formatted requirement.
-    """
-    requirement_name = requirement.partition("==")[0].split("@")[0].strip()
-    return requirement_name
+def separate_package_name(requirement):
+    name, _, version = requirement.partition("==")
+    # Needed to detect the package being installed from source
+    # <package> @ <path to package>==<version>
+    name = name.split('@')[0].strip()
+    return name
 
 
 def parse_package_name(package_name):
@@ -464,6 +455,7 @@ def separate_skip_pypi_wheels(requirements_wheel, skip_pypi_wheels):
 
 def create_pynsist_cfg(
         work_dir,
+        pynsist_pkgs_dir,
         python,
         python_version,
         bitness,
@@ -490,17 +482,23 @@ def create_pynsist_cfg(
     # SEE: https://pynsist.readthedocs.io/en/latest/
 
     '''
+    files = []
     wanted_rqmts_freeze, rqmts_wheel, rqmts_editable = separate_wheels_and_packages(python, unwanted_packages)
     skip_pypi_wheels = [package] + skip_pypi_packages
     if not is_wheel_first:
         wheels_pypi_download = []
-        packages = [package_name(r) for r in wanted_rqmts_freeze]
+        packages = []
         extra_wheel_sources = []
+
+        '''"import sysconfig; print(sysconfig.get_path('purelib'))"'''
+        site_packages_dir = work_dir / 'packaging-venv' / 'Lib' / 'site-packages'
+        shutil.copytree(package_dist_info, pynsist_pkgs_dir / package_dist_info, dirs_exist_ok=True)
+        shutil.copytree(site_packages_dir, pynsist_pkgs_dir, dirs_exist_ok=True)
     else:
         rqmts_wheel_pypi, rqmts_wheel_skip_pypi = separate_skip_pypi_wheels(rqmts_wheel, skip_pypi_wheels)
         wheels_pypi_download, pip_download_dir = pip_wheels_in(work_dir, python, rqmts_wheel_pypi)
         rqmts_packages = list(set(wanted_rqmts_freeze) - set(wheels_pypi_download))
-        packages = [package_name(r) for r in rqmts_packages]
+        packages = [separate_package_name(r) for r in rqmts_packages]
         extra_wheel_sources = [str(pip_download_dir)]
 
     if local_wheel_path and Path(local_wheel_path).exists():
@@ -524,6 +522,7 @@ def create_pynsist_cfg(
 
     installer_exe = installer_name.format(package_name, bitness, suffix)
     changed_icon_exe = change_exe_icon(work_dir, package_name, icon_file)
+    files.append(str(changed_icon_exe))
 
     pynsist_cfg_payload = PYNSIST_CFG_TEMPLATE.format(
         name=package_name,
@@ -541,7 +540,7 @@ def create_pynsist_cfg(
         installer_name=installer_exe,
         template=nsi_template_path,
         package_dist_info=str(package_dist_info),
-        package_exe=str(changed_icon_exe)
+        files="\n    ".join(files)
     )
 
     logger.info(f"pynsist_cfg_payload:\n{pynsist_cfg_payload}")
@@ -586,28 +585,29 @@ def make_work_dir(root: str = None):
     return work_dir.resolve()
 
 
-def copy_assets(assets_dir, work_dir):
-    # NOTE: SHOULD BE TEMPORAL (until jedi has the fix available).
-    # See the 'files' section on the pynsist template config too.
-    logger.info("Copying patched CompiledSubprocess __main__.py for jedi")
-    shutil.copy(
-        "installers/Windows/assets/jedi/__main__.py",
-        os.path.join(work_dir, "__main__.py"))
-
-    logger.info("Copying patched __init__.py for Pylint")
-    shutil.copy(
-        "installers/Windows/assets/pylint/__init__.py",
-        os.path.join(work_dir, "__init__.py"))
-
-    logger.info("Copying required assets for Tkinter to work")
-    shutil.copytree(
-        "installers/Windows/assets/tkinter/lib",
-        os.path.join(work_dir, "lib"),
-        dirs_exist_ok=True)
-    shutil.copytree(
-        "installers/Windows/assets/tkinter/pynsist_pkgs",
-        os.path.join(work_dir, "pynsist_pkgs"),
-        dirs_exist_ok=True)
+# TODO: assets prepares.
+# def copy_assets(assets_dir, work_dir):
+#     # NOTE: SHOULD BE TEMPORAL (until jedi has the fix available).
+#     # See the 'files' section on the pynsist template config too.
+#     logger.info("Copying patched CompiledSubprocess __main__.py for jedi")
+#     shutil.copy(
+#         "installers/Windows/assets/jedi/__main__.py",
+#         os.path.join(work_dir, "__main__.py"))
+#
+#     logger.info("Copying patched __init__.py for Pylint")
+#     shutil.copy(
+#         "installers/Windows/assets/pylint/__init__.py",
+#         os.path.join(work_dir, "__init__.py"))
+#
+#     logger.info("Copying required assets for Tkinter to work")
+#     shutil.copytree(
+#         "installers/Windows/assets/tkinter/lib",
+#         os.path.join(work_dir, "lib"),
+#         dirs_exist_ok=True)
+#     shutil.copytree(
+#         "installers/Windows/assets/tkinter/pynsist_pkgs",
+#         os.path.join(work_dir, "pynsist_pkgs"),
+#         dirs_exist_ok=True)
 
 
 def png_to_icon(png_file, icon_file):
@@ -808,14 +808,22 @@ def run_installer(python_version,
             subprocess_run([env_python, "-m", "pip", "install",
                             extra_package, "--no-warn-script-location"])
 
-        pynsist_cfg = os.path.join(work_dir, "pynsist.cfg")
+        logger.info(f"Uninstalling unwanted packages: {unwanted_packages}")
+        for unwanted_package in unwanted_packages:
+            subprocess_run([env_python, "-m", "pip", "uninstall",
+                            unwanted_package, "--no-warn-script-location"])
+
+        pynsist_cfg = work_dir / "pynsist.cfg"
         logger.info(f"Creating pynsist configuration file [{pynsist_cfg}]")
+        pynsist_pkgs_dir = work_dir / "pynsist_pkgs"
+        pynsist_pkgs_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Creating pynsist_pkgs [{pynsist_pkgs_dir}]")
 
         python_version_embed = find_python_embed_amd64_versions(python_version)
         logger.info(f"python_version_embed = {python_version_embed}, python_version={python_version}")
 
         installer_exe = create_pynsist_cfg(
-            work_dir, env_python, python_version_embed, bitness,
+            work_dir, pynsist_pkgs_dir, env_python, python_version_embed, bitness,
             package_name, package_version, package_author, package_dist_info,
             entrypoint=entrypoint,
             package=package,
@@ -868,7 +876,8 @@ def find_python_embed_amd64_versions(python_version):
     major_version = int(match.group(1))
     minor_version = int(match.group(2))
     micro_version = int(match.group(3))
-    micro_versions = sorted(list(range(20)), key=lambda num: abs(num - micro_version))
+    # micro_versions = sorted(list(range(20)), key=lambda num: abs(num - micro_version))
+    micro_versions = [i for i in range(20, -1, -1)]
     versions = [f"{major_version}.{minor_version}.{micro_version}" for micro_version in micro_versions]
     for version in versions:
         url = f'https://www.python.org/ftp/python/{version}/python-{version}-embed-amd64.zip'
