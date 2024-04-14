@@ -36,33 +36,14 @@ from pprint import pformat
 import requests
 from bibiflags import BibiFlags
 from loguru import logger
-
-# from bibiflags. import BibiFlags
-
-# URL to download assets that the installer needs and that will be put on
-# the assets directory when building the installer
-
-# ASSETS_URL = os.environ.get(
-#     'ASSETS_URL',
-#     'https://github.com/spyder-ide/windows-installer-assets/'
-#     'releases/latest/download/assets.zip')
-#
-# ASSETS_URL = os.environ.get(
-#     'ASSETS_URL',
-#     'https://github.com/spyder-ide/windows-installer-assets/'
-#     'releases/latest/download/assets.zip')
-
-# The pynsist configuration file template that will be used. Of note,
-# with regards to pynsist dependency collection and preparation:
-# - {pypi_wheels} will be downloaded by pynsist from PyPI.
-# - {packages} will be copied by pynsist from the current Python env.
-#
-#
+from packaging.utils import parse_wheel_filename, canonicalize_name, canonicalize_version
 
 PYPI_SERVER_LOCAL_CACHE = 'pypi_server.local_cache.shelve'
 
 PYNSIST_CFG_TEMPLATE = """
+#
 # see: https://pynsist.readthedocs.io/en/latest/cfgfile.html
+#
 [Application]
 name={name}
 version={version}
@@ -79,16 +60,23 @@ format=bundled
 [Include]
 pypi_wheels=
     {pypi_wheels}
+    
 extra_wheel_sources=
     {extra_wheel_sources}
+
+local_wheels=
+    {local_wheels}
+        
 packages=
     {packages}
+    
 files={package_dist_info} > $INSTDIR/pkgs
     {package_exe}
     
 [Build]
 installer_name={installer_name}
 nsi_template={template}
+
 """
 try:
     SRC_HOME = Path(__file__).parent.parent
@@ -114,8 +102,10 @@ class BibiinstallConfigs:
     # PACKAGES
     # '''
     EXTRA_REQUIREMENTS_TXT_PATH: str = ''
+    LOCAL_WHEEL_PATH: str = ''
     EXTRA_PACKAGES: list = field(default_factory=list)
     EDITABLE_PACKAGES: list = field(default_factory=list)
+    SKIP_PYPI_PACKAGES: list = field(default_factory=list)
     UNWANTED_PACKAGES: list = field(default_factory=list)
 
     # '''
@@ -224,12 +214,22 @@ def create_packaging_venv(
     return env_path
 
 
-def pip_freeze(python, encoding):
+def pip_freeze(python, encoding="latin1"):
     """
     Return the "pip freeze --all" output as a list of strings.
     """
     logger.info("Getting frozen requirements.")
     output = subprocess.check_output([python, "-m", "pip", "freeze", "--all"])
+    text = output.decode(encoding)
+    return text.splitlines()
+
+
+def pip_list(python, encoding="latin1"):
+    """
+    Return the "pip list --format=freeze" output as a list of strings.
+    """
+    logger.info("Getting all requirements.")
+    output = subprocess.check_output([python, "-m", "pip", "list", "--format=freeze"])
     text = output.decode(encoding)
     return text.splitlines()
 
@@ -267,83 +267,7 @@ def get_cached_package(name, pypi_server, root=None):
         return yarg_package
 
 
-def pip_wheels_in(work_dir, python, requirements, skip_packages):
-    '''
-    https://packaging.pypa.io/en/stable/utils.html
-    https://pip.pypa.io/en/stable/cli/pip_download/
-
-    '''
-    from packaging.utils import parse_wheel_filename, canonicalize_name, canonicalize_version
-    pip_download = (Path(work_dir) / f"pip_download_only_binaries").resolve()
-    logger.info(f'make pip download dir: [{pip_download}]')
-    pip_download.mkdir(parents=True, exist_ok=True)
-    package_names = []
-    for requirement in requirements:
-        name, _, version = requirement.partition("==")
-        # Needed to detect the package being installed from source
-        # <package> @ <path to package>==<version>
-        name = name.split('@')[0].strip()
-        package_names.append(f"{canonicalize_name(name)}=={canonicalize_version(version, strip_trailing_zero=False)}")
-        if name in skip_packages:
-            logger.info(f"- {requirement} skipped")
-        else:
-            subprocess_run([python, "-m", "pip", "download", "--only-binary", ":all:", "--dest",
-                            pip_download, requirement])
-    whl_files = pip_download.glob("*.whl")
-
-    canonicalize_wheels = []
-    for whl_file in whl_files:
-        name, ver, build, tags = parse_wheel_filename(whl_file.name)
-        logger.info(f"{name} {ver} {build} {tags} [{whl_file}]")
-        canonicalize_wheels.append(f"{name}=={canonicalize_version(ver, strip_trailing_zero=False)}")
-    wheels = []
-    for i, package_name in enumerate(package_names):
-        if package_name in canonicalize_wheels:
-            wheels.append(requirements[i])
-        else:
-            logger.warning(f'{requirements[i]} {package_name}')
-    return wheels, pip_download
-
-
-def pypi_wheels_in(requirements, skip_packages, pypi_server=None):
-    """
-    Return a list of the entries in requirements (distributed as wheels).
-
-    Where requirements is a list of strings formatted like "name==version".
-
-    pypi_server can use mirrors, such as https://pypi.tuna.tsinghua.edu.cn/pypi/
-    """
-    logger.info("Checking for wheel availability at PyPI.")
-    wheels = []
-    for requirement in requirements:
-        name, _, version = requirement.partition("==")
-        # Needed to detect the package being installed from source
-        # <package> @ <path to package>==<version>
-        name = name.split('@')[0].strip()
-        if name in skip_packages:
-            logger.info(f"- {requirement} skipped")
-        else:
-            yarg_package = get_cached_package(name, pypi_server)
-            logger.info(yarg_package)
-            releases = yarg_package.release(version)
-            logger.info(releases)
-            if not releases:
-                raise RuntimeError(
-                    "ABORTING: Did not find {!r} at PyPI. "
-                    "(bad meta-data?)".format(
-                        requirement
-                    )
-                )
-            if any(r.package_type == "wheel" for r in releases):
-                wheels.append(requirement)
-                feedback = "ok"
-            else:
-                feedback = "missing"
-            logger.info(f"- {requirement} {feedback}")
-    return wheels
-
-
-def parse_package_name(requirement):
+def package_name(requirement):
     """
     Return the name component of a `name==version` formatted requirement.
     """
@@ -351,20 +275,146 @@ def parse_package_name(requirement):
     return requirement_name
 
 
-def packages_from(requirements, wheels, skip_packages, add_packages):
-    """
-    Return a list of the entries in requirements that aren't found in wheels.
+def parse_package_name(package_name):
+    name, _, version = package_name.partition("==")
+    # Needed to detect the package being installed from source
+    # <package> @ <path to package>==<version>
+    name = name.split('@')[0].strip()
+    name = str(canonicalize_name(name))
+    return name
 
-    Both assumed to be lists/iterables of strings formatted like
-    "name==version".
-    """
-    requirements = [parse_package_name(p) for p in requirements]
-    wheels = [parse_package_name(p) for p in wheels]
-    skip_packages = [parse_package_name(p) for p in skip_packages]
-    add_packages = [parse_package_name(p) for p in add_packages]
-    packages = set(requirements) - set(wheels) - set(skip_packages)
-    packages = packages | set(add_packages)
-    return list(packages)
+
+def parse_requirement(requirement):
+    name, _, version = requirement.partition("==")
+    name = parse_package_name(name)
+    version = canonicalize_version(version, strip_trailing_zero=False)
+    return name, version
+
+
+def parse_wheel_filename(whl_file):
+    name, version, build, tags = parse_wheel_filename(Path(whl_file).name)
+    logger.info(f"{name} {version} {build} {tags} [{whl_file}]")
+    name = parse_package_name(name)
+    version = canonicalize_version(version, strip_trailing_zero=False)
+    return name, version
+
+
+#
+# def pip_wheels_in(work_dir, python, requirements, skip_pypi_packages):
+#     '''
+#     https://packaging.pypa.io/en/stable/utils.html
+#     https://pip.pypa.io/en/stable/cli/pip_download/
+#     '''
+#     pip_download = (Path(work_dir) / f"pip_download_only_binaries").resolve()
+#     logger.info(f'make pip download dir: [{pip_download}]')
+#     pip_download.mkdir(parents=True, exist_ok=True)
+#     package_names = []
+#     for requirement in requirements:
+#         name, version = parse_requirement(requirement)
+#         package_names.append((name, version))
+#         if name in [parse_package_name(p) for p in skip_pypi_packages]:
+#             logger.info(f"- {requirement} skipped")
+#         else:
+#             subprocess_run([python, "-m", "pip", "download", "--only-binary", ":all:", "--dest",
+#                             pip_download, requirement])
+#
+#     whl_files = pip_download.glob("*.whl")
+#
+#     canonicalize_wheels = []
+#     for whl_file in whl_files:
+#         name, version = parse_wheel_filename(whl_file)
+#         canonicalize_wheels.append((name, version))
+#
+#     wheels = []
+#     for i, package_name in enumerate(package_names):
+#         if package_name in canonicalize_wheels:
+#             wheels.append(requirements[i])
+#         else:
+#             logger.warning(f'{requirements[i]} {package_name}')
+#     return wheels, pip_download
+
+
+def pip_wheels_in(work_dir, python, requirements_wheel_pypi):
+    '''
+    https://packaging.pypa.io/en/stable/utils.html
+    https://pip.pypa.io/en/stable/cli/pip_download/
+    '''
+    pip_download_dir = (Path(work_dir) / f"pip_download_only_binaries").resolve()
+    logger.info(f'make pip download dir: [{pip_download_dir}]')
+    pip_download_dir.mkdir(parents=True, exist_ok=True)
+
+    for requirement in requirements_wheel_pypi:
+        subprocess_run([python, "-m", "pip", "download", "--only-binary", ":all:", "--dest",
+                        pip_download_dir, requirement])
+
+    whl_files = pip_download_dir.glob("*.whl")
+
+    canonicalize_wheels = []
+    for whl_file in whl_files:
+        name, version = parse_wheel_filename(whl_file)
+        canonicalize_wheels.append((name, version))
+
+    wheels_pypi_download = []
+    for i, requirement in enumerate(requirements_wheel_pypi):
+        package_name = parse_package_name(requirement)
+        if package_name in canonicalize_wheels:
+            wheels_pypi_download.append(requirements_wheel_pypi[i])
+        else:
+            logger.warning(f'{requirements_wheel_pypi[i]} {package_name}')
+    return wheels_pypi_download, pip_download_dir
+
+
+# def pypi_wheels_in(requirements, skip_pypi_wheels, pypi_server=None):
+#     """
+#     Return a list of the entries in requirements (distributed as wheels).
+#
+#     Where requirements is a list of strings formatted like "name==version".
+#
+#     pypi_server can use mirrors, such as https://pypi.tuna.tsinghua.edu.cn/pypi/
+#     """
+#     logger.info("Checking for wheel availability at PyPI.")
+#     wheels = []
+#     for requirement in requirements:
+#         name, _, version = requirement.partition("==")
+#         # Needed to detect the package being installed from source
+#         # <package> @ <path to package>==<version>
+#         name = name.split('@')[0].strip()
+#         if name in skip_pypi_wheels:
+#             logger.info(f"- {requirement} skipped")
+#         else:
+#             yarg_package = get_cached_package(name, pypi_server)
+#             logger.info(yarg_package)
+#             releases = yarg_package.release(version)
+#             logger.info(releases)
+#             if not releases:
+#                 raise RuntimeError(
+#                     "ABORTING: Did not find {!r} at PyPI. "
+#                     "(bad meta-data?)".format(
+#                         requirement
+#                     )
+#                 )
+#             if any(r.package_type == "wheel" for r in releases):
+#                 wheels.append(requirement)
+#                 feedback = "ok"
+#             else:
+#                 feedback = "missing"
+#             logger.info(f"- {requirement} {feedback}")
+#     return wheels
+
+
+# def packages_from(requirements, wheels, skip_packages, add_packages):
+#     """
+#     Return a list of the entries in requirements that aren't found in wheels.
+#
+#     Both assumed to be lists/iterables of strings formatted like
+#     "name==version".
+#     """
+#     packages = []
+#     omit_packages = [parse_package_name(p) for p in list(wheels) + list(skip_packages)]
+#     for requirement in list(requirements) + list(add_packages):
+#         if parse_package_name(requirement) not in omit_packages:
+#             packages.append(package_name(requirement))
+#     return packages
 
 
 def update_application_nsi(template_nsi_file, application_nsi_file,
@@ -387,6 +437,31 @@ def update_application_nsi(template_nsi_file, application_nsi_file,
     return Path(application_nsi_file).resolve()
 
 
+def separate_wheels_and_packages(python, unwanted_packages):
+    '''
+    numpy @ file:///D:/bld/numpy_1610324703282/work
+    package-two @ git+https://github.com/owner/repo@41b95ec
+
+    requirements_list = pip_list(python)
+
+    '''
+    requirements_freeze = pip_freeze(python)
+    unwanted_packages_names = [parse_package_name(p) for p in unwanted_packages]
+    wanted_requirements_freeze = [r for r in requirements_freeze if
+                                  parse_package_name(r) not in unwanted_packages_names]
+    requirements_wheel = [r for r in requirements_freeze if '@' not in wanted_requirements_freeze]
+    requirements_editable = [r for r in requirements_freeze if '@' in wanted_requirements_freeze]
+    return wanted_requirements_freeze, requirements_wheel, requirements_editable
+
+
+def separate_skip_pypi_wheels(requirements_wheel, skip_pypi_wheels):
+    skip_pypi_wheels_names = [parse_package_name(p) for p in skip_pypi_wheels]
+    requirements_wheel_pypi = [r for r in requirements_wheel if
+                               parse_package_name(r) not in skip_pypi_wheels_names]
+    requirements_wheel_skip_pypi = list(set(requirements_wheel) - set(requirements_wheel_pypi))
+    return requirements_wheel_pypi, requirements_wheel_skip_pypi
+
+
 def create_pynsist_cfg(
         work_dir,
         python,
@@ -399,49 +474,45 @@ def create_pynsist_cfg(
         entrypoint,
         package,
         unwanted_packages,
-        skip_packages,
-        add_packages,
+        skip_pypi_packages,
         icon_file,
         license_file,
         pynsist_config_file,
         encoding="latin1",
-        extras=None,
         suffix=None,
         nsi_template_path=None,
-        pypi_server=None
+        local_wheel_path=None,
+        is_wheel_first=False
 ):
-    """
-    Create a pynsist configuration file from the PYNSIST_CFG_TEMPLATE.
+    '''
 
-    Determines dependencies by running pip freeze,
-    which are then split between those distributed as PyPI wheels and
-    others. Returns the name of the resulting installer executable, as
-    set into the pynsist configuration file.
-    """
+    # fill extra_wheel_sources, local_wheels
+    # SEE: https://pynsist.readthedocs.io/en/latest/
 
-    requirements = [
-        # Those from pip freeze except the package itself and packages local
-        # installed (by passing a directory path or with the editable flag).
-        # To add such packages the ADD_PACKAGES should include the import names
-        # of the packages.
-        line
-        for line in pip_freeze(python, encoding=encoding)
-        if parse_package_name(line) != package and \
-           parse_package_name(line) not in unwanted_packages and \
-           '-e git' not in line
-    ]
-    skip_wheels = [package] + skip_packages
-    # wheels = pypi_wheels_in(requirements, skip_wheels, pypi_server)
-    wheels, pip_download = pip_wheels_in(work_dir, python, requirements, skip_packages)
-    more_skip_packages = [package] + skip_packages
-    packages = packages_from(requirements, wheels, more_skip_packages, add_packages)
-    logger.info(f'requirements={requirements}')
-    logger.info(f'skip_packages={skip_packages}')
-    logger.info(f'skip_wheels={skip_wheels}')
-    logger.info(f'wheels={wheels}')
-    logger.info(f'more_skip_packages={more_skip_packages}')
-    logger.info(f'add_packages={add_packages}')
+    '''
+    wanted_rqmts_freeze, rqmts_wheel, rqmts_editable = separate_wheels_and_packages(python, unwanted_packages)
+    skip_pypi_wheels = [package] + skip_pypi_packages
+    if not is_wheel_first:
+        wheels_pypi_download = []
+        packages = [package_name(r) for r in wanted_rqmts_freeze]
+        extra_wheel_sources = []
+    else:
+        rqmts_wheel_pypi, rqmts_wheel_skip_pypi = separate_skip_pypi_wheels(rqmts_wheel, skip_pypi_wheels)
+        wheels_pypi_download, pip_download_dir = pip_wheels_in(work_dir, python, rqmts_wheel_pypi)
+        rqmts_packages = list(set(wanted_rqmts_freeze) - set(wheels_pypi_download))
+        packages = [package_name(r) for r in rqmts_packages]
+        extra_wheel_sources = [str(pip_download_dir)]
+
+    if local_wheel_path and Path(local_wheel_path).exists():
+        local_wheels = [str(Path(local_wheel_path).resolve())]
+    else:
+        local_wheels = []
+
+    logger.info(f'wanted_rqmts_freeze={wanted_rqmts_freeze}')
+    logger.info(f'skip_pypi_wheels={skip_pypi_wheels}')
+    logger.info(f'wheels_pypi_download={wheels_pypi_download}')
     logger.info(f'packages={packages}')
+    logger.info(f'extra_wheel_sources={extra_wheel_sources}')
 
     if suffix:
         installer_name = "{}_{}bit_{}.exe"
@@ -450,10 +521,6 @@ def create_pynsist_cfg(
 
     if not suffix:
         suffix = ""
-
-    # fill extra_wheel_sources
-    # SEE: https://pynsist.readthedocs.io/en/latest/
-    extra_wheel_sources = [str(pip_download)]
 
     installer_exe = installer_name.format(package_name, bitness, suffix)
     changed_icon_exe = change_exe_icon(work_dir, package_name, icon_file)
@@ -467,12 +534,13 @@ def create_pynsist_cfg(
         python_version=python_version,
         publisher=package_author,
         bitness=bitness,
-        pypi_wheels="\n    ".join(wheels),
+        pypi_wheels="\n    ".join(wheels_pypi_download),
         extra_wheel_sources="\n    ".join(extra_wheel_sources),
+        local_wheels="\n    ".join(local_wheels),
         packages="\n    ".join(packages),
         installer_name=installer_exe,
         template=nsi_template_path,
-        package_dist_info=package_dist_info,
+        package_dist_info=str(package_dist_info),
         package_exe=str(changed_icon_exe)
     )
 
@@ -541,26 +609,6 @@ def copy_assets(assets_dir, work_dir):
         os.path.join(work_dir, "pynsist_pkgs"),
         dirs_exist_ok=True)
 
-    logger.info("Copying NSIS plugins into discoverable path")
-    contents = os.listdir(
-        "installers/Windows/assets/nsist/plugins/x86-unicode/")
-    logger.info('contents', contents)
-    # for element in contents:
-    #    shutil.copy(
-    #        os.path.join(
-    #            "installers/Windows/assets/nsist/plugins/x86-unicode/",
-    #            element),
-    #        os.path.join(
-    #            "C:/Program Files (x86)/NSIS/Plugins/x86-unicode/",
-    #            element))
-
-
-def copy_assets():
-    # NSIS --> C:/Program Files (x86)/NSIS/
-    # pynsist_pkgs --> work_dir/pynsist_pkgs, same directory of pynsist.cfg
-    #
-    pass
-
 
 def png_to_icon(png_file, icon_file):
     '''
@@ -592,7 +640,7 @@ def read_pyproject_toml_info(file_path):
         return pyproject_info
 
 
-def read_packages(package_txt_file):
+def read_packages(package_txt_file) -> list:
     if package_txt_file and Path(package_txt_file).exists():
         packages = [line.strip().split('#', 1)[0].strip() for line in
                     open(package_txt_file, 'r', encoding='utf').readlines()]
@@ -601,6 +649,15 @@ def read_packages(package_txt_file):
         logger.warning(f'NOT EXIST: [{package_txt_file}]')
         packages = []
     return packages
+
+
+def merge_packages(package_txt_file, packages) -> list:
+    if isinstance(packages, list):
+        merged_packages = packages
+    else:
+        merged_packages = []
+    merged_packages += read_packages(package_txt_file)
+    return merged_packages
 
 
 def prepare_windows_assets(download_assets: bool, ASSETS_URL: str):
@@ -622,15 +679,16 @@ def run_installer(python_version,
                   license_path,
                   pynsist_version=2.8,
                   project_root=None,
-                  extra_packages_txtfile=None,
-                  editable_package_txtfile=None,
-                  unwanted_packages_txtfile=None,
-                  skip_packages_txtfile=None,
-                  add_packages_txtfile=None,
+                  extra_requirements_txt_path=None,
+                  extra_packages=None,
+                  editable_packages=None,
+                  unwanted_packages=None,
+                  skip_pypi_packages=None,
                   conda_path=None,
                   suffix=None,
                   nsi_template_path=None,
-                  pypi_server=None):
+                  local_wheel_path=None,
+                  is_wheel_first=False):
     """
     Run the installer generation.
 
@@ -671,6 +729,7 @@ def run_installer(python_version,
             conda_path=conda_path,
             venv_name=packaging_venv_dir)
 
+        # ''' install pip, setuptools, wheel and package using pip  '''
         logger.info(f"Updating pip in the virtual environment [{env_python}]")
         subprocess_run(
             [env_python, "-m", "pip", "install", "--upgrade", "pip",
@@ -713,46 +772,44 @@ def run_installer(python_version,
             package_version = "0.1.0"
             package_author = ""
 
-        package_dist_info = f"{package_name}-{package_version}.dist-info"
+        package_dist_info = (work_dir / f"{packaging_venv_dir}/Lib/site-packages" /
+                             f"{package_name}-{package_version}.dist-info").resolve()
 
-        logger.info(f"Copy package .dist-info into the pynsist future build directory [{package_dist_info}]")
-        shutil.copytree(
-            os.path.join(work_dir, f"{packaging_venv_dir}/Lib/site-packages", package_dist_info),
-            os.path.join(work_dir, package_dist_info),
-            dirs_exist_ok=True
-        )
+        # logger.info(f"Copy package .dist-info into the pynsist future build directory [{package_dist_info}]")
+        # shutil.copytree(
+        #     os.path.join(work_dir, f"{packaging_venv_dir}/Lib/site-packages", package_dist_info),
+        #     os.path.join(work_dir, package_dist_info),
+        #     dirs_exist_ok=True
+        # )
 
-        logger.info(f"Installing extra packages: [{extra_packages_txtfile}]")
-        if extra_packages_txtfile and Path(extra_packages_txtfile).exists():
+        logger.info(f"Installing extra requirements: [{extra_requirements_txt_path}]")
+        if extra_requirements_txt_path and Path(extra_requirements_txt_path).exists() and Path(
+                extra_requirements_txt_path).is_file():
             subprocess_run([env_python, "-m", "pip", "install", "-r",
-                            extra_packages_txtfile, "--no-warn-script-location"])
+                            str(extra_requirements_txt_path), "--no-warn-script-location"])
         else:
-            logger.warning(f'NOT EXIST extra packages: [{extra_packages_txtfile}]')
+            logger.warning(f'NOT EXIST extra requirements txt file: [{extra_requirements_txt_path}]')
 
-        logger.info(f"Installing packages with the --editable flag: [{editable_package_txtfile}]")
-        editable_packages = read_packages(editable_package_txtfile)
-        logger.info(f"extra_packages : {pformat(editable_packages)}")
-        for e_package in editable_packages:
+        # '''
+        #  --editable:
+        #  It should either be a path to a local project or a VCS URL
+        #  (beginning with bzr+http, bzr+https, bzr+ssh, bzr+sftp, bzr+ftp, bzr+lp,
+        #   bzr+file, git+http, git+https, git+ssh, git+git, git+file,
+        #   hg+file, hg+http, hg+https, hg+ssh, hg+static-http, svn+ssh, svn+http,
+        #   svn+https, svn+svn, svn+file).
+        # '''
+        logger.info(f"Installing packages with the --editable flag: {editable_packages}")
+        for editable_package in editable_packages:
             subprocess_run([env_python, "-m", "pip", "install", "-e",
-                            e_package, "--no-warn-script-location"])
+                            editable_package, "--no-warn-script-location"])
+
+        logger.info(f"Installing extra packages: {extra_packages}")
+        for extra_package in extra_packages:
+            subprocess_run([env_python, "-m", "pip", "install",
+                            extra_package, "--no-warn-script-location"])
 
         pynsist_cfg = os.path.join(work_dir, "pynsist.cfg")
         logger.info(f"Creating pynsist configuration file [{pynsist_cfg}]")
-
-        logger.info("Read unwanted_packages, skip_packages, and add_packages")
-
-        logger.info(f"unwanted_packages: [{unwanted_packages_txtfile}]")
-        unwanted_packages = read_packages(unwanted_packages_txtfile)
-
-        logger.info(f"skip_packages: [{skip_packages_txtfile}]")
-        skip_packages = read_packages(skip_packages_txtfile)
-
-        logger.info(f"add_packages: [{add_packages_txtfile}]")
-        add_packages = read_packages(add_packages_txtfile)
-
-        logger.info(f"unwanted_packages = {unwanted_packages}")
-        logger.info(f"skip_packages = {skip_packages}")
-        logger.info(f"add_packages = {add_packages}")
 
         python_version_embed = find_python_embed_amd64_versions(python_version)
         logger.info(f"python_version_embed = {python_version_embed}, python_version={python_version}")
@@ -763,11 +820,11 @@ def run_installer(python_version,
             entrypoint=entrypoint,
             package=package,
             unwanted_packages=unwanted_packages,
-            skip_packages=skip_packages,
-            add_packages=add_packages,
+            skip_pypi_packages=skip_pypi_packages,
             icon_file=icon_path, license_file=license_path, pynsist_config_file=pynsist_cfg,
-            extras=extra_packages_txtfile,
-            suffix=suffix, nsi_template_path=nsi_template_path, pypi_server=pypi_server)
+            suffix=suffix, nsi_template_path=nsi_template_path,
+            local_wheel_path=local_wheel_path,
+            is_wheel_first=is_wheel_first)
 
         logger.info("Extracting nsis.")
         prepare_nsis_plugins(work_dir)
@@ -861,11 +918,12 @@ def prepare_nsis_plugins(work_dir):
     nsis_plugins_dir = (nsis_dir / 'Plugins').resolve()
     unzip_file(nsis_zip, windows_assets_dir)
     shutil.copytree(nsis_plugins_dir, work_nsis_dir / 'Plugins', dirs_exist_ok=True)
-    # logger.debug(os.environ["PATH"])
     # for pynsist to locate makensis [shutil.which("makensis")]
+    # logger.debug(os.environ["PATH"])
     os.environ["PATH"] += os.pathsep + str(work_nsis_dir)
     # logger.debug(os.environ["PATH"])
     return work_nsis_dir
+
 
 def main():
     config_root = Path(__file__).parent
@@ -897,6 +955,7 @@ def main():
     pynsist_version = flags.parameters.get('pynsist_version')
     suffix = flags.parameters.get('suffix')
     pypi_server = flags.parameters.get('pypi_server')
+    is_wheel_first = flags.parameters.get('is_wheel_first')
 
     icon_path = get_absolute_path(project_root,
                                   flags.parameters.get('icon_path') or configs.ICON_PATH)
@@ -909,16 +968,34 @@ def main():
     license_path = get_absolute_path(project_root,
                                      flags.parameters.get('license_txt_path') or configs.LICENSE_TXT_PATH)
 
-    extra_packages_txtfile = get_absolute_path(project_root,
-                                               flags.parameters.get('extra_packages'))
-    editable_package_txtfile = get_absolute_path(project_root,
-                                                 flags.parameters.get('editable_packages'))
-    unwanted_packages_txtfile = get_absolute_path(project_root,
-                                                  flags.parameters.get('unwanted_packages'))
-    skip_packages_txtfile = get_absolute_path(project_root,
-                                              flags.parameters.get('skip_packages'))
-    add_packages_txtfile = get_absolute_path(project_root,
-                                             flags.parameters.get('add_packages'))
+    extra_requirements_txt_path = get_absolute_path(
+        project_root,
+        flags.parameters.get('extra_requirements_txt_path') or configs.EXTRA_REQUIREMENTS_TXT_PATH
+    )
+    extra_packages_txt_path = get_absolute_path(
+        project_root,
+        flags.parameters.get('extra_packages_txt_path'))
+    editable_packages_txt_path = get_absolute_path(project_root,
+                                                   flags.parameters.get('editable_packages_txt_path'))
+    unwanted_packages_txt_path = get_absolute_path(project_root,
+                                                   flags.parameters.get('unwanted_packages_txt_path'))
+    skip_pypi_packages_txt_path = get_absolute_path(project_root,
+                                                    flags.parameters.get('skip_pypi_packages_txt_path'))
+    local_wheel_path = get_absolute_path(project_root,
+                                         flags.parameters.get('local_wheel_path'))
+
+    extra_packages = merge_packages(extra_packages_txt_path, configs.EXTRA_PACKAGES)
+    logger.info(f"extra_packages : {pformat(extra_packages)}")
+
+    editable_packages = merge_packages(editable_packages_txt_path, configs.EDITABLE_PACKAGES)
+    logger.info(f"editable_packages : {pformat(editable_packages)}")
+
+    unwanted_packages = merge_packages(unwanted_packages_txt_path, configs.UNWANTED_PACKAGES)
+    logger.info(f"unwanted_packages: {pformat(unwanted_packages)}")
+
+    skip_pypi_packages = merge_packages(skip_pypi_packages_txt_path, configs.SKIP_PYPI_PACKAGES)
+    logger.info(f"skip_pypi_packages: {pformat(skip_pypi_packages)}")
+
     conda_path = get_absolute_path(project_root,
                                    flags.parameters.get('conda_path'))
 
@@ -937,15 +1014,16 @@ def main():
         icon_path=icon_path,
         license_path=license_path,
         project_root=project_root,
-        extra_packages_txtfile=extra_packages_txtfile,
-        editable_package_txtfile=editable_package_txtfile,
-        unwanted_packages_txtfile=unwanted_packages_txtfile,
-        skip_packages_txtfile=skip_packages_txtfile,
-        add_packages_txtfile=add_packages_txtfile,
+        extra_requirements_txt_path=extra_requirements_txt_path,
+        extra_packages=extra_packages,
+        editable_packages=editable_packages,
+        skip_pypi_packages=skip_pypi_packages,
+        unwanted_packages=unwanted_packages,
         conda_path=conda_path,
         suffix=suffix,
         nsi_template_path=nsi_template_path,
-        pypi_server=pypi_server
+        local_wheel_path=local_wheel_path,
+        is_wheel_first=is_wheel_first
     )
 
 

@@ -21,11 +21,12 @@ LICENSE_TXT_PATH: str = 'license.txt'
 '''
 PACKAGES 
 '''
-EXTRA_REQUIREMENTS_TXT_PATH: str = ''
 EXTRA_PACKAGES: list = []
 EDITABLE_PACKAGES: list = []
 UNWANTED_PACKAGES: list = []
 
+EXTRA_REQUIREMENTS_TXT_PATH: str = ''
+LOCAL_WHEEL_PATH: str = ''
 '''
 FILES 
 '''

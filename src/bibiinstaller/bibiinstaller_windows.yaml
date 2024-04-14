@@ -41,39 +41,45 @@ flags:
       - --license_txt_path
     type: str
 
-  - dest: extra_packages
+  - dest: extra_requirements_txt_path
+    help: Path to a .txt file with a list of packages to be installed by [pip install -r *.txt] besides the dependencies of the main package
+    option_strings:
+      - -xr
+      - --extra_requirements_txt_path
+    type: str
+
+  - dest: extra_packages_txt_path
     help: Path to a .txt file with a list of packages to be added to the installer besides the dependencies of the main package
     option_strings:
       - -xp
-      - --extra_packages
+      - --extra_packages_txt_path
     type: str
 
-  - dest: editable_packages
+  - dest: editable_packages_txt_path
     help: Path to a .txt file with a list of packages to be installed using the editable flag
     option_strings:
       - -ep
-      - --editable_packages
+      - --editable_packages_txt_path
     type: str
 
-  - dest: add_packages
-    help: Path to a .txt file with a list of packages to be added to the packages section regardless wheel checks or packages skipped
-    option_strings:
-      - -ap
-      - --add_packages
-    type: str
-
-  - dest: skip_packages
-    help: Path to a .txt file with a list of packages to be skiped when checking for wheels and instead add them directly in the 'packages' section,
+  - dest: skip_pypi_packages_txt_path
+    help: Path to a .txt file with a list of packages will not use online pypi packages
     option_strings:
       - -sp
-      - --skip_packages
+      - --skip_pypi_packages_txt_path
     type: str
 
-  - dest: unwanted_packages
+  - dest: unwanted_packages_txt_path
     help: Path to a .txt file with a list of packages to be removed from the requirements
     option_strings:
       - -up
-      - --unwanted_packages
+      - --unwanted_packages_txt_path
+    type: str
+
+  - dest: local_wheel_path
+    help: Path to *.whl wheel files on the local filesystem.
+    option_strings:
+      - --local_wheel_path
     type: str
 
   - dest: conda_path
@@ -101,6 +107,13 @@ flags:
     option_strings:
       - --pynsist_version
     type: str
+
+  - default: false
+    dest: is_wheel_first
+    help: pynsist using wheel online instead of local installed packages.
+    option_strings:
+      - --is_wheel_first
+    type: bool
 
   - dest: pypi_server
     # default: https://pypi.tuna.tsinghua.edu.cn/pypi/
