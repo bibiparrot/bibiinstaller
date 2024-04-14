@@ -28,6 +28,7 @@ import shelve
 import shutil
 import subprocess
 import sys
+import traceback
 import zipfile
 from dataclasses import dataclass, fields, field
 from pathlib import Path
@@ -266,7 +267,7 @@ def separate_package_name(requirement):
     return name
 
 
-def parse_package_name(package_name):
+def canonicalize_package_name(package_name):
     name, _, version = package_name.partition("==")
     # Needed to detect the package being installed from source
     # <package> @ <path to package>==<version>
@@ -275,17 +276,17 @@ def parse_package_name(package_name):
     return name
 
 
-def parse_requirement(requirement):
+def canonicalize_requirement(requirement):
     name, _, version = requirement.partition("==")
-    name = parse_package_name(name)
+    name = canonicalize_package_name(name)
     version = canonicalize_version(version, strip_trailing_zero=False)
     return name, version
 
 
-def parse_wheel_filename(whl_file):
+def canonicalize_wheel_filename(whl_file):
     name, version, build, tags = parse_wheel_filename(Path(whl_file).name)
-    logger.info(f"{name} {version} {build} {tags} [{whl_file}]")
-    name = parse_package_name(name)
+    # logger.info(f"{name} {version} {build} {tags} [{whl_file}]")
+    name = canonicalize_package_name(name)
     version = canonicalize_version(version, strip_trailing_zero=False)
     return name, version
 
@@ -330,10 +331,12 @@ def pip_wheels_in(work_dir, python, requirements_wheel_pypi):
     https://packaging.pypa.io/en/stable/utils.html
     https://pip.pypa.io/en/stable/cli/pip_download/
     '''
+
     pip_download_dir = (Path(work_dir) / f"pip_download_only_binaries").resolve()
     logger.info(f'make pip download dir: [{pip_download_dir}]')
     pip_download_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.debug(f'requirements_wheel_pypi = {requirements_wheel_pypi}')
     for requirement in requirements_wheel_pypi:
         subprocess_run([python, "-m", "pip", "download", "--only-binary", ":all:", "--dest",
                         pip_download_dir, requirement])
@@ -342,16 +345,19 @@ def pip_wheels_in(work_dir, python, requirements_wheel_pypi):
 
     canonicalize_wheels = []
     for whl_file in whl_files:
-        name, version = parse_wheel_filename(whl_file)
+        # logger.debug(f'whl_file = {whl_file}')
+        name, version = canonicalize_wheel_filename(whl_file)
         canonicalize_wheels.append((name, version))
 
+    logger.debug(canonicalize_wheels)
     wheels_pypi_download = []
     for i, requirement in enumerate(requirements_wheel_pypi):
-        package_name = parse_package_name(requirement)
-        if package_name in canonicalize_wheels:
+        name, version = canonicalize_requirement(requirement)
+        if (name, version) in canonicalize_wheels:
             wheels_pypi_download.append(requirements_wheel_pypi[i])
         else:
-            logger.warning(f'{requirements_wheel_pypi[i]} {package_name}')
+            logger.warning(f'NOT FOUND in pypi: {(name, version)}  {requirements_wheel_pypi[i]}')
+    logger.debug(f'wheels_pypi_download = {wheels_pypi_download}')
     return wheels_pypi_download, pip_download_dir
 
 
@@ -437,18 +443,21 @@ def separate_wheels_and_packages(python, unwanted_packages):
 
     '''
     requirements_freeze = pip_freeze(python)
-    unwanted_packages_names = [parse_package_name(p) for p in unwanted_packages]
+    unwanted_packages_names = [canonicalize_package_name(p) for p in unwanted_packages]
     wanted_requirements_freeze = [r for r in requirements_freeze if
-                                  parse_package_name(r) not in unwanted_packages_names]
-    requirements_wheel = [r for r in requirements_freeze if '@' not in wanted_requirements_freeze]
-    requirements_editable = [r for r in requirements_freeze if '@' in wanted_requirements_freeze]
+                                  canonicalize_package_name(r) not in unwanted_packages_names]
+    requirements_wheel = [r for r in requirements_freeze if '@' not in r]
+    requirements_editable = [r for r in requirements_freeze if '@' in r]
+    logger.debug(f'wanted_requirements_freeze={pformat(wanted_requirements_freeze)}')
+    logger.debug(f'requirements_wheel={pformat(requirements_wheel)}')
+    logger.debug(f'requirements_editable={pformat(requirements_editable)}')
     return wanted_requirements_freeze, requirements_wheel, requirements_editable
 
 
 def separate_skip_pypi_wheels(requirements_wheel, skip_pypi_wheels):
-    skip_pypi_wheels_names = [parse_package_name(p) for p in skip_pypi_wheels]
+    skip_pypi_wheels_names = [canonicalize_package_name(p) for p in skip_pypi_wheels]
     requirements_wheel_pypi = [r for r in requirements_wheel if
-                               parse_package_name(r) not in skip_pypi_wheels_names]
+                               canonicalize_package_name(r) not in skip_pypi_wheels_names]
     requirements_wheel_skip_pypi = list(set(requirements_wheel) - set(requirements_wheel_pypi))
     return requirements_wheel_pypi, requirements_wheel_skip_pypi
 
@@ -484,7 +493,7 @@ def create_pynsist_cfg(
     '''
     files = []
     wanted_rqmts_freeze, rqmts_wheel, rqmts_editable = separate_wheels_and_packages(python, unwanted_packages)
-    skip_pypi_wheels = [package] + skip_pypi_packages
+    skip_pypi_wheels = [package_name] + skip_pypi_packages
     if not is_wheel_first:
         wheels_pypi_download = []
         packages = []
@@ -506,11 +515,11 @@ def create_pynsist_cfg(
     else:
         local_wheels = []
 
-    logger.info(f'wanted_rqmts_freeze={wanted_rqmts_freeze}')
-    logger.info(f'skip_pypi_wheels={skip_pypi_wheels}')
-    logger.info(f'wheels_pypi_download={wheels_pypi_download}')
-    logger.info(f'packages={packages}')
-    logger.info(f'extra_wheel_sources={extra_wheel_sources}')
+    logger.debug(f'wanted_rqmts_freeze={wanted_rqmts_freeze}')
+    logger.debug(f'skip_pypi_wheels={skip_pypi_wheels}')
+    logger.debug(f'wheels_pypi_download={wheels_pypi_download}')
+    logger.debug(f'packages={packages}')
+    logger.debug(f'extra_wheel_sources={extra_wheel_sources}')
 
     if suffix:
         installer_name = "{}_{}bit_{}.exe"

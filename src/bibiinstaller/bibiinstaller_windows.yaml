@@ -108,7 +108,7 @@ flags:
       - --pynsist_version
     type: str
 
-  - default: false
+  - default: true
     dest: is_wheel_first
     help: pynsist using wheel online instead of local installed packages.
     option_strings:
