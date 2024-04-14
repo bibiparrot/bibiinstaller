@@ -71,11 +71,11 @@ nsi_template={template}
 
 """
 try:
-    SRC_HOME = Path(__file__).parent.parent
+    CONFIG_HOME = Path(__file__).parent
+    ASSETS_HOME = Path(__file__).parent / 'assets'
 except NameError:
-    SRC_HOME = Path('.').parent.parent
-
-ASSETS_HOME = SRC_HOME / 'assets'
+    CONFIG_HOME = Path('.')
+    ASSETS_HOME = Path('.') / 'assets'
 
 
 @dataclass
@@ -944,7 +944,6 @@ def prepare_nsis_plugins(work_dir):
 
 
 def main():
-    config_root = Path(__file__).parent
     import argparse
     parser = argparse.ArgumentParser(
         prog='bibiinstaller',
@@ -952,7 +951,7 @@ def main():
     parser.add_argument('configs.py')
     flags = BibiFlags(app_name='bibiinstaller_windows',
                       argparser=parser,
-                      root=str(config_root))
+                      root=str(CONFIG_HOME))
     logger.debug(pformat(flags.parameters, sort_dicts=False))
 
     configs_py_file = flags.parameters['configs.py']

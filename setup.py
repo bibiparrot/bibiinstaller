@@ -14,12 +14,11 @@ setup(
     author='Chunqi Shi',
     author_email='chunqishi@gmail.com',
     description='Bibi Installer using pynsist',
-    # packages=['bibiinstaller'],
     package_dir={'': 'src'},
     packages=find_packages(
         where='src',  # '.' by default
-        include=['bibiinstaller'],  # ['*'] by default
-        exclude=['assets'],  # empty by default
+        include=['*'],  # ['*'] by default
+        exclude=[],  # empty by default
     ),
     install_requires=[
         "yarg>=0.1.9",
