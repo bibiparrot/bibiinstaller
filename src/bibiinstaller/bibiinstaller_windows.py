@@ -1016,7 +1016,7 @@ def main():
     conda_path = get_absolute_path(project_root,
                                    flags.parameters.get('conda_path'))
 
-    nsi_template_path = get_absolute_path(config_root, flags.parameters.get('nsi_template_path'))
+    nsi_template_path = get_absolute_path(CONFIG_HOME, flags.parameters.get('nsi_template_path'))
 
     if (not (Path(project_root) / 'setup.py').exists()) and (not (Path(project_root) / 'pyproject.toml').exists()):
         sys.exit(f"Invalid project_root: [{project_root}], NO 'setup.py' or 'pyproject.toml' under it.")

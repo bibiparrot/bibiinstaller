@@ -9,11 +9,11 @@ https://setuptools.pypa.io/en/latest/userguide/entry_point.html
 setup(
     name='bibiinstaller',
     version='0.1.0',
-    url='',
+    url='https://github.com/bibiparrot/bibiinstaller',
     license='GPL v3',
     author='Chunqi Shi',
     author_email='chunqishi@gmail.com',
-    description='Bibi Installer using pynsist',
+    description='Bibi Installer using pynsist for Windows',
     package_dir={'': 'src'},
     packages=find_packages(
         where='src',  # '.' by default

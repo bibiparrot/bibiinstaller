@@ -1,9 +1,14 @@
 [project]
 name = "bibiinstaller"
 version = "0.1.0"
-description = "Bibi Installer using pynsist"
+description = "Bibi Installer using pynsist for Windows"
 authors = [
     {name = "Chunqi SHI", email = "chunqishi@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
 ]
 
 dependencies = [
@@ -15,10 +20,15 @@ dependencies = [
     "pillow>=10.3.0",
     "pyarmor>=8.5.2",
 ]
-#requires-python = "==3.10.*"
+
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
+
+
+[project.urls]
+Homepage = "https://github.com/bibiparrot/bibiinstaller"
+Issues = "https://github.com/bibiparrot/bibiinstaller/issues"
 
 
 [tool.pdm]
@@ -31,10 +41,8 @@ dev = [
 ]
 
 [tool.poetry]
-# ...
 packages = [
-    { include = "bibiinstaller" , from = "src"},
-    { include = "assets" , from = "src"},
+    { include = "*" , from = "src"},
 ]
 
 [project.scripts]
