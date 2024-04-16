@@ -21,7 +21,7 @@ setup(
         exclude=[],  # empty by default
     ),
     install_requires=[
-        "yarg>=0.1.9",
+#        "yarg>=0.1.9",
         "loguru>=0.7.2",
         "bibiflags>=0.1.5",
         "packaging>=24.0",

@@ -137,7 +137,7 @@ def from_dict_to_dataclass(cls, data: dict):
     )
 
 
-def subprocess_run(args):
+def subprocess_run(args, exit=True):
     """
     Wrapper-function around subprocess.run.
 
@@ -152,7 +152,8 @@ def subprocess_run(args):
     except subprocess.CalledProcessError as exc:
         logger.warning(exc)
         logger.debug(cp.stderr)
-        sys.exit(cp.returncode)
+        if exit:
+            sys.exit(cp.returncode)
 
 
 def create_python_env(target_directory, python_version: str, environment_name: str = None):
@@ -339,7 +340,7 @@ def pip_wheels_in(work_dir, python, requirements_wheel_pypi):
     logger.debug(f'requirements_wheel_pypi = {requirements_wheel_pypi}')
     for requirement in requirements_wheel_pypi:
         subprocess_run([python, "-m", "pip", "download", "--only-binary", ":all:", "--dest",
-                        pip_download_dir, requirement])
+                        pip_download_dir, requirement], exit=False)
 
     whl_files = pip_download_dir.glob("*.whl")
 
@@ -494,6 +495,7 @@ def create_pynsist_cfg(
     files = []
     wanted_rqmts_freeze, rqmts_wheel, rqmts_editable = separate_wheels_and_packages(python, unwanted_packages)
     skip_pypi_wheels = [package_name] + skip_pypi_packages
+    logger.info(f'is_wheel_first={is_wheel_first}')
     if not is_wheel_first:
         wheels_pypi_download = []
         packages = []
@@ -873,7 +875,7 @@ def get_absolute_path(root, file):
 
 def url_exist(url):
     try:
-        response = requests.head(url)
+        response = requests.head(url, timeout=5)
         return response.status_code == 200
     except requests.exceptions.RequestException as e:
         return False
@@ -943,6 +945,22 @@ def prepare_nsis_plugins(work_dir):
     return work_nsis_dir
 
 
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(
@@ -972,10 +990,12 @@ def main():
     pynsist_version = flags.parameters.get('pynsist_version')
     suffix = flags.parameters.get('suffix')
     pypi_server = flags.parameters.get('pypi_server')
-    is_wheel_first = flags.parameters.get('is_wheel_first')
+    is_wheel_first = strtobool(flags.parameters.get('is_wheel_first', False))
 
     icon_path = get_absolute_path(project_root,
                                   flags.parameters.get('icon_path') or configs.ICON_PATH)
+    if not Path(icon_path).exists():
+        sys.exit(f"NOT Exist icon_path = [{icon_path}]")
 
     if not str(icon_path).lower().endswith('ico'):
         icon_path_convert = str(icon_path) + '.ico'
@@ -984,6 +1004,9 @@ def main():
 
     license_path = get_absolute_path(project_root,
                                      flags.parameters.get('license_txt_path') or configs.LICENSE_TXT_PATH)
+
+    if not Path(license_path).exists():
+        sys.exit(f"NOT Exist license_path = [{license_path}]")
 
     extra_requirements_txt_path = get_absolute_path(
         project_root,
