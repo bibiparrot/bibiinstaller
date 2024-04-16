@@ -8,7 +8,7 @@ https://setuptools.pypa.io/en/latest/userguide/entry_point.html
 
 setup(
     name='bibiinstaller',
-    version='0.1.0',
+    version='0.1.1',
     url='https://github.com/bibiparrot/bibiinstaller',
     license='GPL v3',
     author='Chunqi Shi',
