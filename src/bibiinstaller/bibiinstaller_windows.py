@@ -154,6 +154,7 @@ def subprocess_run(args, exit=True):
         logger.debug(cp.stderr)
         if exit:
             sys.exit(cp.returncode)
+    return cp.returncode
 
 
 def create_python_env(target_directory, python_version: str, environment_name: str = None):
@@ -765,6 +766,9 @@ def run_installer(python_version,
                         "pip", "install", project_root,
                         "--no-warn-script-location"])
 
+        logger.info(f"Check entrypoint： {entrypoint}")
+        check_entrypoint(env_python, entrypoint)
+
         if (Path(project_root) / 'setup.py').exists():
             setup_info = read_setup_py_info(Path(project_root) / 'setup.py')
             logger.debug(setup_info)
@@ -952,13 +956,33 @@ def strtobool(val):
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
     'val' is anything else.
     """
-    val = val.lower()
+    val = str(val).lower().strip()
     if val in ('y', 'yes', 't', 'true', 'on', '1'):
         return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+    elif val in ('n', 'no', 'f', 'false', 'off', '0', 'none', ''):
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+def check_entrypoint(python_env, entrypoint: str, max_execution_time: int = 2):
+    entrypoint_package, _, entrypoint_function = entrypoint.partition(':')
+    python_command = f'from {entrypoint_package} import {entrypoint_function}; {entrypoint_function}()'
+    args = [python_env, '-c', python_command]
+
+    logger.info(f'$ {" ".join([str(x) for x in args])}')
+    try:
+        cp = subprocess.run(args, capture_output=True, text=True, timeout=max_execution_time,
+                            creationflags=subprocess.CREATE_NO_WINDOW)
+        logger.info(f'returncode = {cp.returncode}, stdout = {cp.stdout}, stderr = {cp.stderr}')
+        if cp.returncode != 0:
+            sys.exit(F"FAILED,  entrypoint [{entrypoint}] error: {cp.stderr}.")
+        else:
+            logger.info(f'PASSED, entrypoint [{entrypoint}] output: {cp.stdout}.')
+            return True
+    except subprocess.TimeoutExpired:
+        logger.info(f'PASSED, overtime {max_execution_time}s and killed.')
+        return True
 
 
 def main():
