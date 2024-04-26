@@ -1,6 +1,6 @@
 [project]
 name = "bibiinstaller"
-version = "0.1.2"
+version = "0.1.3"
 description = "Bibi Installer using pynsist for Windows"
 authors = [
     {name = "Chunqi SHI", email = "chunqishi@gmail.com"},
