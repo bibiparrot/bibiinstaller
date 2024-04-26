@@ -34,7 +34,9 @@ UNWANTED_PACKAGES: list = []
 '''
 FILES 
 '''
-# ''' e.g: [ libs, data_dir, (from_file, $INSTDIR/to_dir) ] '''
+# ''' e.g: [ 'libs', 'data_dir', ('from_file', '$INSTDIR/to_dir') ] '''
 FILE_CONFIGS: list = []
+# ''' e.g: [ 'pkgs/PySide/examples',  'data_dir/ignoredfile' ] '''
+EXCLUDE_CONFIGS: list = []
 # ''' e.g: pynsist_pkgs '''
 ASSETS_PATH: str = ''

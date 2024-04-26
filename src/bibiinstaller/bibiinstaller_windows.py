@@ -64,6 +64,7 @@ extra_wheel_sources={extra_wheel_sources}
 local_wheels={local_wheels}     
 packages={packages}  
 files={files}
+exclude={exclude}
 
 [Build]
 installer_name={installer_name}
@@ -104,6 +105,7 @@ class BibiinstallConfigs:
     # FILES
     # '''
     FILE_CONFIGS: list = field(default_factory=list)
+    EXCLUDE_CONFIGS: list = field(default_factory=list)
     ASSETS_PATH: str = ''
 
     @staticmethod
@@ -480,7 +482,10 @@ def create_pynsist_cfg(
         skip_pypi_packages,
         icon_file,
         license_file,
+        asset_path,
         pynsist_config_file,
+        files,
+        excludes,
         encoding="latin1",
         suffix=None,
         nsi_template_path=None,
@@ -493,9 +498,19 @@ def create_pynsist_cfg(
     # SEE: https://pynsist.readthedocs.io/en/latest/
 
     '''
-    files = []
+    if files is None:
+        files = []
     wanted_rqmts_freeze, rqmts_wheel, rqmts_editable = separate_wheels_and_packages(python, unwanted_packages)
     skip_pypi_wheels = [package_name] + skip_pypi_packages
+
+    if asset_path is not None:
+        logger.debug(f'COPY {asset_path} into {pynsist_pkgs_dir}')
+        if len(str(asset_path).strip()) > 1 and Path(str(asset_path)).exists():
+            if Path(str(asset_path)).is_file():
+                shutil.copy2(Path(str(asset_path)), pynsist_pkgs_dir)
+            if Path(str(asset_path)).is_dir():
+                shutil.copytree(Path(str(asset_path)), pynsist_pkgs_dir, dirs_exist_ok=True)
+
     logger.info(f'is_wheel_first={is_wheel_first}')
     if not is_wheel_first:
         wheels_pypi_download = []
@@ -535,6 +550,8 @@ def create_pynsist_cfg(
     installer_exe = installer_name.format(package_name, bitness, suffix)
     changed_icon_exe = change_exe_icon(work_dir, package_name, icon_file)
     files.append(str(changed_icon_exe))
+    if excludes is None:
+        excludes = []
 
     pynsist_cfg_payload = PYNSIST_CFG_TEMPLATE.format(
         name=package_name,
@@ -552,7 +569,8 @@ def create_pynsist_cfg(
         installer_name=installer_exe,
         template=nsi_template_path,
         package_dist_info=str(package_dist_info),
-        files="\n    ".join(files)
+        files="\n    ".join(files),
+        exclude="\n    ".join(excludes)
     )
 
     logger.info(f"pynsist_cfg_payload:\n{pynsist_cfg_payload}")
@@ -689,6 +707,9 @@ def run_installer(python_version,
                   package,
                   icon_path,
                   license_path,
+                  files=None,
+                  excludes=None,
+                  asset_path=None,
                   pynsist_version=2.8,
                   project_root=None,
                   extra_requirements_txt_path=None,
@@ -844,7 +865,9 @@ def run_installer(python_version,
             package=package,
             unwanted_packages=unwanted_packages,
             skip_pypi_packages=skip_pypi_packages,
-            icon_file=icon_path, license_file=license_path, pynsist_config_file=pynsist_cfg,
+            icon_file=icon_path, license_file=license_path,
+            pynsist_config_file=pynsist_cfg,
+            files=files, excludes=excludes, asset_path=asset_path,
             suffix=suffix, nsi_template_path=nsi_template_path,
             local_wheel_path=local_wheel_path,
             is_wheel_first=is_wheel_first)
@@ -1013,7 +1036,7 @@ def main():
 
     pynsist_version = flags.parameters.get('pynsist_version')
     suffix = flags.parameters.get('suffix')
-    pypi_server = flags.parameters.get('pypi_server')
+    # pypi_server = flags.parameters.get('pypi_server')
     is_wheel_first = strtobool(flags.parameters.get('is_wheel_first', False))
 
     icon_path = get_absolute_path(project_root,
@@ -1074,9 +1097,11 @@ def main():
         entrypoint=entrypoint,
         package=package,
         pynsist_version=pynsist_version,
-
         icon_path=icon_path,
         license_path=license_path,
+        files=configs.FILE_CONFIGS,
+        excludes=configs.EXCLUDE_CONFIGS,
+        asset_path=configs.ASSETS_PATH,
         project_root=project_root,
         extra_requirements_txt_path=extra_requirements_txt_path,
         extra_packages=extra_packages,
