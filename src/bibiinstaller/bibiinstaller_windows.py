@@ -519,7 +519,7 @@ def create_pynsist_cfg(
 
         '''"import sysconfig; print(sysconfig.get_path('purelib'))"'''
         site_packages_dir = work_dir / 'packaging-venv' / 'Lib' / 'site-packages'
-        shutil.copytree(package_dist_info, pynsist_pkgs_dir, dirs_exist_ok=True)
+        shutil.copytree(package_dist_info, pynsist_pkgs_dir / package_dist_info, dirs_exist_ok=True)
         shutil.copytree(site_packages_dir, pynsist_pkgs_dir, dirs_exist_ok=True)
     else:
         rqmts_wheel_pypi, rqmts_wheel_skip_pypi = separate_skip_pypi_wheels(rqmts_wheel, skip_pypi_wheels)
